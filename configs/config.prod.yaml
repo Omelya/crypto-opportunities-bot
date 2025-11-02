@@ -1,0 +1,16 @@
+app:
+  environment: production
+  port: 8080
+  log_level: info
+
+telegram:
+  webhook_url: "https://yourbot.com/webhook"
+  debug: false
+
+database:
+  host: db
+  sslmode: require
+  max_conns: 50
+
+redis:
+  host: redis
