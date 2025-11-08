@@ -79,6 +79,7 @@ func LoadConfig(configPath string) (*Config, error) {
 	config.Database.User = getEnv("DB_USER", config.Database.User)
 	config.Database.Password = getEnv("DB_PASSWORD", config.Database.Password)
 	config.Database.DBName = getEnv("DB_NAME", config.Database.DBName)
+	config.Database.Port = getEnv("DB_PORT", config.Database.Port)
 	config.Redis.Password = getEnv("REDIS_PASSWORD", config.Redis.Password)
 	config.Payment.StripePublishableKey = getEnv("STRIPE_PUBLISHABLE_KEY", config.Payment.StripePublishableKey)
 	config.Payment.StripeWebhookSecret = getEnv("STRIPE_WEBHOOK_SECRET", config.Payment.StripeWebhookSecret)
