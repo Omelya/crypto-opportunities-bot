@@ -20,15 +20,19 @@ type Scraper interface {
 	ScrapeLearnEarn() ([]*models.Opportunity, error)
 }
 
+type OpportunityCallback func(*models.Opportunity)
+
 type Service struct {
-	scrapers []Scraper
-	oppRepo  repository.OpportunityRepository
+	scrapers                []Scraper
+	oppRepo                 repository.OpportunityRepository
+	newOpportunityCallbacks []OpportunityCallback
 }
 
 func NewScraperService(oppRepo repository.OpportunityRepository) *Service {
 	return &Service{
-		scrapers: []Scraper{},
-		oppRepo:  oppRepo,
+		scrapers:                []Scraper{},
+		oppRepo:                 oppRepo,
+		newOpportunityCallbacks: []OpportunityCallback{},
 	}
 }
 
@@ -37,9 +41,11 @@ func (s *Service) RegisterScraper(scraper Scraper) {
 	log.Printf("Registered scraper: %s", scraper.GetExchange())
 }
 
-func (s *Service) RunAll() error {
-	log.Println("Starting scraping process...")
+func (s *Service) OnNewOpportunity(callback OpportunityCallback) {
+	s.newOpportunityCallbacks = append(s.newOpportunityCallbacks, callback)
+}
 
+func (s *Service) RunAll() error {
 	totalNew := 0
 	totalUpdated := 0
 
@@ -64,6 +70,8 @@ func (s *Service) RunAll() error {
 				}
 				totalNew++
 				log.Printf("✅ New opportunity: %s - %s", opp.Exchange, opp.Title)
+
+				s.notifyNewOpportunity(opp)
 			} else {
 				existing.Title = opp.Title
 				existing.Description = opp.Description
@@ -87,6 +95,12 @@ func (s *Service) RunAll() error {
 	}
 
 	return nil
+}
+
+func (s *Service) notifyNewOpportunity(opp *models.Opportunity) {
+	for _, callback := range s.newOpportunityCallbacks {
+		go callback(opp)
+	}
 }
 
 func GenerateExternalID(exchange, oppType, title string) string {
