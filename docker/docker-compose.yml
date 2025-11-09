@@ -8,19 +8,25 @@ services:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
+      PGDATA: /var/lib/postgresql/data/pgdata
     ports:
-      - "${DB_PORT}:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+    networks:
+      - crypto_bot_network
 
   redis:
     image: redis:7-alpine
     container_name: crypto_bot_redis
+    command: redis-server --appendonly yes
     ports:
       - "${REDIS_PORT}:6379"
     volumes:
@@ -30,7 +36,33 @@ services:
       interval: 10s
       timeout: 3s
       retries: 3
+    restart: unless-stopped
+    networks:
+      - crypto_bot_network
+
+  # Uncomment when ready for production deployment
+  # bot:
+  #   build:
+  #     context: ..
+  #     dockerfile: docker/Dockerfile
+  #   container_name: crypto_bot_app
+  #   env_file:
+  #     - ../.env
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+  #   networks:
+  #     - crypto_bot_network
 
 volumes:
   postgres_data:
+    driver: local
   redis_data:
+    driver: local
+
+networks:
+  crypto_bot_network:
+    driver: bridge

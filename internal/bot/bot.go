@@ -12,6 +12,7 @@ type Bot struct {
 	api               *tgbotapi.BotAPI
 	userRepo          repository.UserRepository
 	prefsRepo         repository.UserPreferencesRepository
+	oppRepo           repository.OpportunityRepository
 	config            *config.Config
 	onboardingManager *OnboardingManager
 }
@@ -20,6 +21,7 @@ func NewBot(
 	cfg *config.Config,
 	userRepo repository.UserRepository,
 	prefsRepo repository.UserPreferencesRepository,
+	oppRepo repository.OpportunityRepository,
 ) (*Bot, error) {
 	api, err := tgbotapi.NewBotAPI(cfg.Telegram.BotToken)
 	if err != nil {
@@ -34,6 +36,7 @@ func NewBot(
 		api,
 		userRepo,
 		prefsRepo,
+		oppRepo,
 		cfg,
 		NewOnboardingManager(),
 	}, nil

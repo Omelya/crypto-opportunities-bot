@@ -69,6 +69,7 @@ func main() {
 
 	scraperService := scraper.NewScraperService(oppRepo)
 	scraperService.RegisterScraper(scraper.NewBinanceScraper())
+	scraperService.RegisterScraper(scraper.NewBybitScraper())
 
 	scraperService.OnNewOpportunity(func(opp *models.Opportunity) {
 		log.Printf("📢 Creating notifications for: %s", opp.Title)
@@ -93,7 +94,15 @@ func main() {
 	notificationTicker := startNotificationDispatcher(notificationService)
 	defer notificationTicker.Stop()
 
-	telegramBot, err := bot.NewBot(cfg, userRepo, prefsRepo)
+	// Daily Digest Scheduler
+	digestScheduler := notification.NewDigestScheduler(notificationService)
+	if err := digestScheduler.Start(); err != nil {
+		log.Fatalf("Failed to start digest scheduler: %v", err)
+	}
+	log.Printf("✅ Daily digest scheduler started")
+	defer digestScheduler.Stop()
+
+	telegramBot, err := bot.NewBot(cfg, userRepo, prefsRepo, oppRepo)
 	if err != nil {
 		log.Fatalf("Failed to create bot: %v", err)
 	}

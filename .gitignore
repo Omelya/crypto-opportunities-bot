@@ -1,17 +1,69 @@
-# Environment
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+crypto-bot
+bot
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.html
+coverage.out
+
+# Go workspace file
+go.work
+
+# Environment variables
 .env
 .env.local
-*.local.yaml
-
-# Binaries
-bin/
-*.exe
+.env.*.local
 
 # IDE
-.vscode/
 .idea/
+.vscode/
 *.swp
-
-# OS
+*.swo
+*~
 .DS_Store
+
+# Logs
+logs/
+*.log
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Backups
+backups/
+*.backup
+*.dump
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Build artifacts
+dist/
+build/
+bin/
+
+# Vendor (if not using modules)
+vendor/
+
+# Config overrides
+configs/config.local.yaml
+configs/*.local.yaml
+
+# Debug
+__debug_bin
+
+# OS specific
 Thumbs.db
