@@ -55,6 +55,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&models.UserPreferences{},
 		&models.Opportunity{},
 		&models.Notification{},
+		&models.UserAction{},
 	)
 }
 

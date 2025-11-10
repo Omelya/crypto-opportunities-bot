@@ -4,6 +4,7 @@ import (
 	"crypto-opportunities-bot/internal/config"
 	"crypto-opportunities-bot/internal/repository"
 	"log"
+	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -13,6 +14,7 @@ type Bot struct {
 	userRepo          repository.UserRepository
 	prefsRepo         repository.UserPreferencesRepository
 	oppRepo           repository.OpportunityRepository
+	actionRepo        repository.UserActionRepository
 	config            *config.Config
 	onboardingManager *OnboardingManager
 }
@@ -22,6 +24,7 @@ func NewBot(
 	userRepo repository.UserRepository,
 	prefsRepo repository.UserPreferencesRepository,
 	oppRepo repository.OpportunityRepository,
+	actionRepo repository.UserActionRepository,
 ) (*Bot, error) {
 	api, err := tgbotapi.NewBotAPI(cfg.Telegram.BotToken)
 	if err != nil {
@@ -37,6 +40,7 @@ func NewBot(
 		userRepo,
 		prefsRepo,
 		oppRepo,
+		actionRepo,
 		cfg,
 		NewOnboardingManager(),
 	}, nil
@@ -98,6 +102,27 @@ func (b *Bot) handleCallback(callback *tgbotapi.CallbackQuery) {
 		log.Println(err)
 	}
 
+	data := callback.Data
+
+	// Menu callbacks
+	if strings.HasPrefix(data, "menu_") {
+		b.handleMenuCallback(callback)
+		return
+	}
+
+	// Filter callbacks
+	if strings.HasPrefix(data, "filter_") {
+		b.handleFilterCallback(callback)
+		return
+	}
+
+	// Pagination callbacks
+	if strings.HasPrefix(data, "page_") {
+		b.handlePaginationCallback(callback)
+		return
+	}
+
+	// Onboarding callbacks
 	switch callback.Data {
 	// Language
 	case CallbackLanguageUK:

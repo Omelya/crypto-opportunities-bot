@@ -36,4 +36,27 @@ const (
 	CallbackOppAirdrop    = "opp_airdrop"
 	CallbackOppLearnEarn  = "opp_learn_earn"
 	CallbackOppComplete   = "opp_complete"
+
+	// Menu callbacks
+	CallbackMenuToday    = "menu_today"
+	CallbackMenuAll      = "menu_all"
+	CallbackMenuSettings = "menu_settings"
+	CallbackMenuStats    = "menu_stats"
+	CallbackMenuPremium  = "menu_premium"
+
+	// Opportunities filter callbacks
+	CallbackFilterAll        = "filter_all"
+	CallbackFilterLaunchpool = "filter_launchpool"
+	CallbackFilterAirdrop    = "filter_airdrop"
+	CallbackFilterLearnEarn  = "filter_learn_earn"
+	CallbackFilterStaking    = "filter_staking"
+
+	// Opportunity detail callbacks
+	CallbackOppDetail = "opp_detail_"
+	CallbackOppLink   = "opp_link_"
+	CallbackOppIgnore = "opp_ignore_"
+
+	// Pagination callbacks
+	CallbackPageNext = "page_next_"
+	CallbackPagePrev = "page_prev_"
 )

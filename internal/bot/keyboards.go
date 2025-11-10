@@ -1,6 +1,11 @@
 package bot
 
-import tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+import (
+	"crypto-opportunities-bot/internal/models"
+	"fmt"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+)
 
 func (b *Bot) buildLanguageKeyboard() tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(
@@ -36,17 +41,17 @@ func (b *Bot) buildCapitalKeyboard() tgbotapi.InlineKeyboardMarkup {
 func (b *Bot) buildMainMenuKeyboard() tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("💰 Сьогодні", "menu_today"),
+			tgbotapi.NewInlineKeyboardButtonData("💰 Сьогодні", CallbackMenuToday),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📊 Всі можливості", "menu_all"),
+			tgbotapi.NewInlineKeyboardButtonData("📊 Всі можливості", CallbackMenuToday),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("⚙️ Налаштування", "menu_settings"),
-			tgbotapi.NewInlineKeyboardButtonData("📈 Статистика", "menu_stats"),
+			tgbotapi.NewInlineKeyboardButtonData("⚙️ Налаштування", CallbackMenuSettings),
+			tgbotapi.NewInlineKeyboardButtonData("📈 Статистика", CallbackMenuStats),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("💎 Premium", "menu_premium"),
+			tgbotapi.NewInlineKeyboardButtonData("💎 Premium", CallbackMenuPremium),
 		),
 	)
 }
@@ -60,7 +65,7 @@ func (b *Bot) buildPremiumKeyboard() tgbotapi.InlineKeyboardMarkup {
 			tgbotapi.NewInlineKeyboardButtonData("💳 Підписатись ($9/міс)", CallbackPremiumBuy),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("⬅️ Назад", "menu_today"),
+			tgbotapi.NewInlineKeyboardButtonData("⬅️ Назад", CallbackMenuToday),
 		),
 	)
 }
@@ -153,7 +158,67 @@ func (b *Bot) buildSettingsKeyboard() tgbotapi.InlineKeyboardMarkup {
 			tgbotapi.NewInlineKeyboardButtonData("🌐 Змінити мову", "settings_language"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("⬅️ Головне меню", "menu_today"),
+			tgbotapi.NewInlineKeyboardButtonData("⬅️ Головне меню", CallbackMenuAll),
 		),
 	)
+}
+
+func (b *Bot) buildOpportunitiesFilterKeyboard(currentFilter string, hasPagination bool, page int) tgbotapi.InlineKeyboardMarkup {
+	mark := func(filter string) string {
+		if currentFilter == filter {
+			return "✅ "
+		}
+		return ""
+	}
+
+	rows := [][]tgbotapi.InlineKeyboardButton{
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(mark("all")+"🌐 Всі", CallbackFilterAll),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(mark("launchpool")+"🚀 Launchpool", CallbackFilterLaunchpool),
+			tgbotapi.NewInlineKeyboardButtonData(mark("airdrop")+"🎁 Airdrops", CallbackFilterAirdrop),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(mark("learn_earn")+"📚 Learn & Earn", CallbackFilterLearnEarn),
+			tgbotapi.NewInlineKeyboardButtonData(mark("staking")+"💎 Staking", CallbackFilterStaking),
+		),
+	}
+
+	if hasPagination {
+		paginationRow := []tgbotapi.InlineKeyboardButton{}
+		if page > 0 {
+			paginationRow = append(paginationRow,
+				tgbotapi.NewInlineKeyboardButtonData("⬅️ Назад", fmt.Sprintf("%s%d", CallbackPagePrev, page-1)),
+			)
+		}
+		paginationRow = append(paginationRow,
+			tgbotapi.NewInlineKeyboardButtonData("➡️ Далі", fmt.Sprintf("%s%d", CallbackPageNext, page+1)),
+		)
+		rows = append(rows, paginationRow)
+	}
+
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("⬅️ Головне меню", CallbackMenuAll),
+	))
+
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+}
+
+func (b *Bot) buildOpportunityDetailKeyboard(opp *models.Opportunity) tgbotapi.InlineKeyboardMarkup {
+	rows := [][]tgbotapi.InlineKeyboardButton{}
+
+	if opp.URL != "" {
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonURL("🔗 Перейти на біржу", opp.URL),
+		))
+	}
+
+	rows = append(rows,
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("⬅️ Назад до списку", CallbackFilterAll),
+		),
+	)
+
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }

@@ -50,6 +50,7 @@ func main() {
 	prefsRepo := repository.NewUserPreferencesRepository(db)
 	oppRepo := repository.NewOpportunityRepository(db)
 	notifRepo := repository.NewNotificationRepository(db)
+	actionRepo := repository.NewUserActionRepository(db)
 
 	botAPI, err := tgbotapi.NewBotAPI(cfg.Telegram.BotToken)
 	if err != nil {
@@ -102,7 +103,7 @@ func main() {
 	log.Printf("✅ Daily digest scheduler started")
 	defer digestScheduler.Stop()
 
-	telegramBot, err := bot.NewBot(cfg, userRepo, prefsRepo, oppRepo)
+	telegramBot, err := bot.NewBot(cfg, userRepo, prefsRepo, oppRepo, actionRepo)
 	if err != nil {
 		log.Fatalf("Failed to create bot: %v", err)
 	}
