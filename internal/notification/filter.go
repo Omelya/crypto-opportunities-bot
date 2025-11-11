@@ -182,22 +182,34 @@ func (f *Filter) matchesRiskProfile(riskProfile string, opp *models.Opportunity)
 	case "high":
 		return true
 
-	default: // medium
+	default:
 		return opp.Type != models.OpportunityTypeDeFi
 	}
 }
 
 func (f *Filter) isDigestTime(digestTime, timezone string) bool {
-	// TODO: Врахувати timezone користувача
-	// Зараз просто перевіряємо чи поточний час близький до вказаного
+	loc, err := time.LoadLocation(timezone)
+	if err != nil {
+		loc = time.UTC
+	}
 
-	now := time.Now()
+	now := time.Now().In(loc)
 	currentTime := now.Format("15:04")
 
-	return currentTime >= digestTime && currentTime < addMinutes(digestTime, 30)
+	targetTime := digestTime
+	if targetTime == "" {
+		targetTime = "09:00"
+	}
+
+	if currentTime < targetTime {
+		return false
+	}
+
+	endTime := f.addMinutes(targetTime, 30)
+	return currentTime < endTime
 }
 
-func addMinutes(timeStr string, minutes int) string {
+func (f *Filter) addMinutes(timeStr string, minutes int) string {
 	t, err := time.Parse("15:04", timeStr)
 	if err != nil {
 		return timeStr

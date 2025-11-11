@@ -97,7 +97,7 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 }
 
 func (b *Bot) handleCallback(callback *tgbotapi.CallbackQuery) {
-	_, err := b.api.Send(tgbotapi.NewCallback(callback.Data, ""))
+	_, err := b.api.Send(tgbotapi.NewCallback(callback.ID, callback.Data))
 	if err != nil {
 		log.Println(err)
 	}
@@ -119,6 +119,73 @@ func (b *Bot) handleCallback(callback *tgbotapi.CallbackQuery) {
 	// Pagination callbacks
 	if strings.HasPrefix(data, "page_") {
 		b.handlePaginationCallback(callback)
+		return
+	}
+
+	// Settings callbacks
+	if strings.HasPrefix(data, "settings_") && data != CallbackSettingsBack {
+		b.handleSettingsCallback(callback)
+		return
+	}
+
+	// Exchange toggles
+	if strings.HasPrefix(data, "exchange_") && data != CallbackExchangeDone {
+		switch data {
+		case CallbackExchangeBinance:
+			b.handleExchangeToggle(callback, "binance")
+		case CallbackExchangeBybit:
+			b.handleExchangeToggle(callback, "bybit")
+		case CallbackExchangeOKX:
+			b.handleExchangeToggle(callback, "okx")
+		case CallbackExchangeGateIO:
+			b.handleExchangeToggle(callback, "gateio")
+		}
+		return
+	}
+
+	// Type toggles
+	if strings.HasPrefix(data, "type_") && data != CallbackTypeDone {
+		switch data {
+		case CallbackTypeLaunchpool:
+			b.handleTypeToggle(callback, "launchpool")
+		case CallbackTypeAirdrop:
+			b.handleTypeToggle(callback, "airdrop")
+		case CallbackTypeLearnEarn:
+			b.handleTypeToggle(callback, "learn_earn")
+		case CallbackTypeStaking:
+			b.handleTypeToggle(callback, "staking")
+		}
+		return
+	}
+
+	// Digest settings
+	if data == CallbackDigestToggle {
+		b.handleDigestToggle(callback)
+		return
+	}
+
+	if _, ok := map[string]struct{}{
+		CallbackDigestDone:   {},
+		CallbackSettingsBack: {},
+		CallbackTypeDone:     {},
+		CallbackExchangeDone: {},
+	}[data]; ok {
+		chatID := callback.Message.Chat.ID
+		userID := callback.From.ID
+
+		user, _ := b.userRepo.GetByTelegramID(userID)
+		prefs, _ := b.prefsRepo.GetByUserID(user.ID)
+
+		deleteMsg := tgbotapi.NewDeleteMessage(chatID, callback.Message.MessageID)
+		b.sendMessage(deleteMsg)
+
+		b.showSettingsMenu(chatID, user, prefs)
+		return
+	}
+
+	// Capital/Risk/Language settings
+	if strings.HasPrefix(data, "set_") {
+		b.handleSettingsUpdate(callback)
 		return
 	}
 
@@ -161,11 +228,72 @@ func (b *Bot) handleCallback(callback *tgbotapi.CallbackQuery) {
 		b.handleOpportunitiesToggle(callback, "learn_earn")
 	case CallbackOppComplete:
 		b.handleOpportunitiesComplete(callback)
+	}
+}
 
-		// Premium
-		//case CallbackPremiumTry, CallbackPremiumBuy:
-		//	b.handlePremiumAction(callback)
-		//case CallbackStayFree:
-		//	b.handleStayFree(callback)
+func (b *Bot) handleSettingsUpdate(callback *tgbotapi.CallbackQuery) {
+	chatID := callback.Message.Chat.ID
+	userID := callback.From.ID
+
+	user, err := b.userRepo.GetByTelegramID(userID)
+	if err != nil || user == nil {
+		b.sendError(chatID)
+		return
+	}
+
+	prefs, err := b.prefsRepo.GetByUserID(user.ID)
+	if err != nil || prefs == nil {
+		b.sendError(chatID)
+		return
+	}
+
+	updated := false
+
+	switch callback.Data {
+	// Capital
+	case CallbackSetCapital100_500:
+		user.CapitalRange = "100-500"
+		updated = true
+	case CallbackSetCapital500_2000:
+		user.CapitalRange = "500-2000"
+		updated = true
+	case CallbackSetCapital2000_5000:
+		user.CapitalRange = "2000-5000"
+		updated = true
+	case CallbackSetCapital5000Plus:
+		user.CapitalRange = "5000+"
+		updated = true
+
+	// Risk
+	case CallbackSetRiskLow:
+		user.RiskProfile = "low"
+		updated = true
+	case CallbackSetRiskMedium:
+		user.RiskProfile = "medium"
+		updated = true
+	case CallbackSetRiskHigh:
+		user.RiskProfile = "high"
+		updated = true
+
+	// Language
+	case CallbackSetLanguageUK:
+		user.LanguageCode = "uk"
+		updated = true
+	case CallbackSetLanguageEN:
+		user.LanguageCode = "en"
+		updated = true
+	}
+
+	if updated {
+		if err := b.userRepo.Update(user); err != nil {
+			log.Printf("Error updating user: %v", err)
+			b.sendError(chatID)
+			return
+		}
+
+		deleteMsg := tgbotapi.NewDeleteMessage(chatID, callback.Message.MessageID)
+		b.sendMessage(deleteMsg)
+
+		b.showSettingsMenu(chatID, user, prefs)
 	}
 }

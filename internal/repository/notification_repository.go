@@ -19,6 +19,7 @@ type NotificationRepository interface {
 	GetFailed(limit int) ([]*models.Notification, error)
 	CountByStatus(status string) (int64, error)
 	CountByUserAndStatus(userID uint, status string) (int64, error)
+	CountTodayByUser(userID uint) (int64, error)
 	DeleteOld(days int) error
 	DeleteByUserID(userID uint) error
 }
@@ -131,6 +132,19 @@ func (r *notificationRepository) CountByUserAndStatus(userID uint, status string
 	var count int64
 	err := r.db.Model(&models.Notification{}).
 		Where("user_id = ? AND status = ?", userID, status).
+		Count(&count).Error
+
+	return count, err
+}
+
+func (r *notificationRepository) CountTodayByUser(userID uint) (int64, error) {
+	var count int64
+	today := time.Now().Truncate(24 * time.Hour)
+
+	err := r.db.Model(&models.Notification{}).
+		Where("user_id = ?", userID).
+		Where("created_at >= ?", today).
+		Where("type != ?", "daily_digest").
 		Count(&count).Error
 
 	return count, err

@@ -152,9 +152,24 @@ func (b *Bot) handleStats(message *tgbotapi.Message) {
 }
 
 func (b *Bot) handleSettings(message *tgbotapi.Message) {
-	text := "⚙️ Налаштування:\n\n🔜 Скоро тут будуть налаштування!"
-	msg := tgbotapi.NewMessage(message.Chat.ID, text)
-	b.sendMessage(msg)
+	chatID := message.Chat.ID
+	userID := message.From.ID
+
+	user, err := b.userRepo.GetByTelegramID(userID)
+	if err != nil || user == nil {
+		b.sendError(chatID)
+		return
+	}
+
+	prefs, err := b.prefsRepo.GetByUserID(user.ID)
+	if err != nil || prefs == nil {
+		text := "⚠️ Спочатку налаштуй свій профіль через /start"
+		msg := tgbotapi.NewMessage(chatID, text)
+		b.sendMessage(msg)
+		return
+	}
+
+	b.showSettingsMenu(chatID, user, prefs)
 }
 
 func (b *Bot) handlePremium(message *tgbotapi.Message) {
@@ -289,6 +304,8 @@ func (b *Bot) sendOpportunitiesList(chatID int64, user *models.User, opportuniti
 	if len(opportunities) == 0 {
 		text := "🔍 Можливостей не знайдено"
 		msg := tgbotapi.NewMessage(chatID, text)
+		msg.ParseMode = "HTML"
+		msg.ReplyMarkup = b.buildOpportunitiesFilterKeyboard(filter, len(opportunities) > 20, page)
 		b.sendMessage(msg)
 		return
 	}
@@ -322,7 +339,14 @@ func (b *Bot) sendOpportunitiesList(chatID int64, user *models.User, opportuniti
 				roi = fmt.Sprintf(" • %.1f%% ROI", opp.EstimatedROI)
 			}
 
-			text.WriteString(fmt.Sprintf("   • %s%s\n", b.truncate(opp.Title, 50), roi))
+			exchangeLink := fmt.Sprintf(`<a href="%s">%s</a>`, opp.URL, opp.Exchange)
+
+			text.WriteString(fmt.Sprintf(
+				"   • %s%s • %s\n",
+				b.truncate(opp.Title, 50),
+				roi,
+				exchangeLink,
+			))
 		}
 		text.WriteString("\n")
 	}

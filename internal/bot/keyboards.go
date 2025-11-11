@@ -65,7 +65,7 @@ func (b *Bot) buildPremiumKeyboard() tgbotapi.InlineKeyboardMarkup {
 			tgbotapi.NewInlineKeyboardButtonData("💳 Підписатись ($9/міс)", CallbackPremiumBuy),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("⬅️ Назад", CallbackMenuToday),
+			tgbotapi.NewInlineKeyboardButtonData("⬅️ Назад", CallbackMenuAll),
 		),
 	)
 }
@@ -143,19 +143,22 @@ func (b *Bot) buildPremiumOfferKeyboard() tgbotapi.InlineKeyboardMarkup {
 func (b *Bot) buildSettingsKeyboard() tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("💰 Змінити капітал", "settings_capital"),
+			tgbotapi.NewInlineKeyboardButtonData("💰 Змінити капітал", CallbackSettingsCapital),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("⚖️ Змінити ризик-профіль", "settings_risk"),
+			tgbotapi.NewInlineKeyboardButtonData("⚖️ Змінити ризик-профіль", CallbackSettingsRisk),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🏦 Обрати біржі", "settings_exchanges"),
+			tgbotapi.NewInlineKeyboardButtonData("🏦 Обрати біржі", CallbackSettingsExchanges),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📊 Типи можливостей", "settings_types"),
+			tgbotapi.NewInlineKeyboardButtonData("📊 Типи можливостей", CallbackSettingsTypes),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🌐 Змінити мову", "settings_language"),
+			tgbotapi.NewInlineKeyboardButtonData("🌐 Змінити мову", CallbackSettingsLanguage),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("📬 Дайджест", CallbackSettingsDigest),
 		),
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("⬅️ Головне меню", CallbackMenuAll),

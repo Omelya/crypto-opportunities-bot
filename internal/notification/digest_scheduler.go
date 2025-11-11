@@ -3,30 +3,33 @@ package notification
 import (
 	"crypto-opportunities-bot/internal/repository"
 	"log"
+	"time"
 
 	"github.com/robfig/cron/v3"
 )
 
 type DigestScheduler struct {
-	cron    *cron.Cron
-	service *Service
+	cron     *cron.Cron
+	service  *Service
+	userRepo repository.UserRepository
+	timezone string
 }
 
 func NewDigestScheduler(service *Service) *DigestScheduler {
 	return &DigestScheduler{
-		cron:    cron.New(),
-		service: service,
+		cron:     cron.New(),
+		service:  service,
+		userRepo: service.userRepo,
+		timezone: "UTC",
 	}
 }
 
 func (s *DigestScheduler) Start() error {
-	// Відправка щоденного дайджесту о 09:00 UTC
-	_, err := s.cron.AddFunc("0 9 * * *", func() {
-		log.Println("⏰ Starting daily digest job...")
-		if err := s.service.SendDailyDigestToAll(); err != nil {
-			log.Printf("❌ Daily digest error: %v", err)
+	_, err := s.cron.AddFunc("0 * * * *", func() {
+		log.Println("⏰ Running hourly digest check...")
+		if err := s.sendDigestsByTimezone(); err != nil {
+			log.Printf("❌ Digest error: %v", err)
 		}
-		log.Println("✅ Daily digest job completed")
 	})
 
 	if err != nil {
@@ -34,7 +37,7 @@ func (s *DigestScheduler) Start() error {
 	}
 
 	s.cron.Start()
-	log.Println("✅ Daily digest scheduler started (runs at 09:00 UTC)")
+	log.Println("✅ Daily digest scheduler started (checks every hour)")
 
 	return nil
 }
@@ -46,48 +49,72 @@ func (s *DigestScheduler) Stop() {
 
 func (s *DigestScheduler) RunNow() error {
 	log.Println("Running daily digest manually...")
-	return s.service.SendDailyDigestToAll()
+	return s.sendDigestsByTimezone()
 }
 
-// UserDigestJob - для індивідуальної відправки з врахуванням timezone
-type UserDigestJob struct {
-	service  *Service
-	userRepo repository.UserRepository
-}
-
-func NewUserDigestJob(service *Service, userRepo repository.UserRepository) *UserDigestJob {
-	return &UserDigestJob{
-		service:  service,
-		userRepo: userRepo,
-	}
-}
-
-// Run відправляє дайджест користувачам згідно з їх timezone
-func (j *UserDigestJob) Run() error {
-	// TODO: Імплементувати логіку з врахуванням timezone користувачів
-	// Поки що просто відправляємо всім о 09:00 UTC
-
-	users, err := j.userRepo.List(0, 10000)
+func (s *DigestScheduler) sendDigestsByTimezone() error {
+	users, err := s.userRepo.List(0, 10000)
 	if err != nil {
 		return err
 	}
 
 	sent := 0
-	failed := 0
+	skipped := 0
 
 	for _, user := range users {
 		if !user.IsActive || user.IsBlocked {
+			skipped++
 			continue
 		}
 
-		if err := j.service.SendDailyDigest(user.ID); err != nil {
+		prefs, err := s.service.prefsRepo.GetByUserID(user.ID)
+		if err != nil || prefs == nil {
+			skipped++
+			continue
+		}
+
+		if !prefs.DailyDigestEnabled {
+			skipped++
+			continue
+		}
+
+		if !s.isDigestTimeForUser(user.Timezone, prefs.DailyDigestTime) {
+			skipped++
+			continue
+		}
+
+		if err := s.service.SendDailyDigest(user.ID); err != nil {
 			log.Printf("Failed to send digest to user %d: %v", user.ID, err)
-			failed++
 		} else {
 			sent++
 		}
+
+		time.Sleep(100 * time.Millisecond)
 	}
 
-	log.Printf("Daily digest job: sent %d, failed %d", sent, failed)
+	if sent > 0 {
+		log.Printf("Daily digest: sent %d, skipped %d", sent, skipped)
+	}
+
 	return nil
+}
+
+func (s *DigestScheduler) isDigestTimeForUser(userTimezone, digestTime string) bool {
+	loc, err := time.LoadLocation(userTimezone)
+	if err != nil {
+		loc = time.UTC
+	}
+
+	now := time.Now().In(loc)
+	currentHour := now.Format("15:04")
+
+	targetTime := digestTime
+	if targetTime == "" {
+		targetTime = "09:00"
+	}
+
+	targetHour := targetTime[:2]
+	currentHourInt := currentHour[:2]
+
+	return currentHourInt == targetHour
 }

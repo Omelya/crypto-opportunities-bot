@@ -41,7 +41,7 @@ func NewService(
 func (s *Service) CreateOpportunityNotifications(opp *models.Opportunity) error {
 	log.Printf("Creating notifications for opportunity: %s", opp.Title)
 
-	users, err := s.userRepo.List(0, 10000) // TODO: Pagination для великої кількості
+	users, err := s.userRepo.List(0, 10000)
 	if err != nil {
 		return fmt.Errorf("failed to get users: %w", err)
 	}
@@ -66,10 +66,14 @@ func (s *Service) CreateOpportunityNotifications(opp *models.Opportunity) error 
 
 		if !user.IsPremium() {
 			limit := s.filter.GetDailyAlertLimit(user)
-			todayCount, _ := s.getTodayNotificationsCount(user.ID)
+			todayCount, err := s.notifRepo.CountTodayByUser(user.ID)
+			if err != nil {
+				log.Printf("Failed to count today notifications for user %d: %v", user.ID, err)
+				continue
+			}
 
 			if todayCount >= int64(limit) {
-				log.Printf("Daily limit reached for user %d", user.ID)
+				log.Printf("Daily limit reached for user %d (%d/%d)", user.ID, todayCount, limit)
 				continue
 			}
 		}
@@ -166,7 +170,7 @@ func (s *Service) SendDailyDigest(userID uint) error {
 		return fmt.Errorf("preferences not found for user: %d", userID)
 	}
 
-	if !s.filter.ShouldSendDailyDigest(user, prefs) {
+	if !prefs.DailyDigestEnabled {
 		return nil
 	}
 
@@ -178,7 +182,7 @@ func (s *Service) SendDailyDigest(userID uint) error {
 	message := s.formatter.FormatDailyDigest(opportunities, user)
 
 	if !user.IsPremium() && len(opportunities) > 0 {
-		message += s.formatter.FormatPremiumTeaser(10) // TODO: Реальна кількість пропущених
+		message += s.formatter.FormatPremiumTeaser(10)
 	}
 
 	notification := &models.Notification{
@@ -216,6 +220,15 @@ func (s *Service) SendDailyDigestToAll() error {
 	failed := 0
 
 	for _, user := range users {
+		prefs, err := s.prefsRepo.GetByUserID(user.ID)
+		if err != nil || prefs == nil {
+			continue
+		}
+
+		if !s.filter.ShouldSendDailyDigest(user, prefs) {
+			continue
+		}
+
 		if err := s.SendDailyDigest(user.ID); err != nil {
 			log.Printf("Failed to send digest to user %d: %v", user.ID, err)
 			failed++
@@ -290,12 +303,6 @@ func (s *Service) sendNotification(notification *models.Notification) error {
 	}
 
 	return nil
-}
-
-func (s *Service) getTodayNotificationsCount(userID uint) (int64, error) {
-	// TODO: Додати метод в repository для підрахунку сьогоднішніх нотифікацій
-	// Поки що повертаємо 0
-	return 0, nil
 }
 
 func (s *Service) getRecentOpportunities(user *models.User, prefs *models.UserPreferences, duration time.Duration) ([]*models.Opportunity, error) {
