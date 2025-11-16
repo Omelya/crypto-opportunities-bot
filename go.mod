@@ -3,6 +3,7 @@ module crypto-opportunities-bot
 go 1.25.3
 
 require (
+	github.com/gorilla/websocket v1.5.1
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.31.0
 )
