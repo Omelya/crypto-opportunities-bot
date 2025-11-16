@@ -162,7 +162,18 @@ func (b *Bot) handleCallback(callback *tgbotapi.CallbackQuery) {
 	}
 
 	// Settings callbacks
-	if strings.HasPrefix(data, "settings_") && data != CallbackSettingsBack {
+	if strings.HasPrefix(data, "settings_") ||
+		strings.HasPrefix(data, "set_capital_") ||
+		strings.HasPrefix(data, "set_risk_") ||
+		strings.HasPrefix(data, "toggle_type_") ||
+		strings.HasPrefix(data, "toggle_exchange_") ||
+		strings.HasPrefix(data, "set_roi_") ||
+		strings.HasPrefix(data, "set_investment_") ||
+		strings.HasPrefix(data, "toggle_notify_") ||
+		data == "back_settings" ||
+		data == "save_types" ||
+		data == "save_exchanges" ||
+		data == "save_notifications" {
 		b.handleSettingsCallback(callback)
 		return
 	}
