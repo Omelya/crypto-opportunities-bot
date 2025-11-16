@@ -1,6 +1,9 @@
 package main
 
 import (
+	"context"
+	"crypto-opportunities-bot/internal/arbitrage"
+	"crypto-opportunities-bot/internal/arbitrage/websocket"
 	"crypto-opportunities-bot/internal/bot"
 	"crypto-opportunities-bot/internal/config"
 	"crypto-opportunities-bot/internal/models"
@@ -54,6 +57,7 @@ func main() {
 	actionRepo := repository.NewUserActionRepository(db)
 	subsRepo := repository.NewSubscriptionRepository(db)
 	paymentRepo := repository.NewPaymentRepository(db)
+	arbRepo := repository.NewArbitrageRepository(db)
 
 	botAPI, err := tgbotapi.NewBotAPI(cfg.Telegram.BotToken)
 	if err != nil {
@@ -140,7 +144,18 @@ func main() {
 	log.Printf("✅ Daily digest scheduler started")
 	defer digestScheduler.Stop()
 
-	telegramBot, err := bot.NewBot(cfg, userRepo, prefsRepo, oppRepo, actionRepo, subsRepo, paymentService)
+	// Arbitrage System (Premium feature)
+	var arbitrageDetector *arbitrage.Detector
+	if cfg.Arbitrage.Enabled {
+		arbitrageDetector = startArbitrageMonitoring(cfg, arbRepo, userRepo, notificationService)
+	} else {
+		log.Printf("⚠️ Arbitrage monitoring disabled in config")
+	}
+	if arbitrageDetector != nil {
+		defer arbitrageDetector.Stop()
+	}
+
+	telegramBot, err := bot.NewBot(cfg, userRepo, prefsRepo, oppRepo, actionRepo, subsRepo, arbRepo, paymentService)
 	if err != nil {
 		log.Fatalf("Failed to create bot: %v", err)
 	}
@@ -204,4 +219,107 @@ func startSubscriptionChecker(service *payment.Service) *time.Ticker {
 
 	log.Println("✅ Subscription checker started (every 1h)")
 	return ticker
+}
+
+func startArbitrageMonitoring(
+	cfg *config.Config,
+	arbRepo repository.ArbitrageRepository,
+	userRepo repository.UserRepository,
+	notificationService *notification.Service,
+) *arbitrage.Detector {
+	// Перевірити чи є Premium користувачі
+	premiumCount, err := userRepo.CountPremium()
+	if err != nil {
+		log.Printf("⚠️ Error checking premium users: %v", err)
+		return nil
+	}
+
+	if premiumCount == 0 {
+		log.Printf("⚠️ No premium users - arbitrage monitoring paused")
+		// TODO: Періодично перевіряти чи з'явились Premium користувачі
+		return nil
+	}
+
+	log.Printf("📊 Found %d premium users - starting arbitrage monitoring", premiumCount)
+
+	// Create OrderBook Manager
+	obManager := arbitrage.NewOrderBookManager()
+
+	// Initialize WebSocket managers for each exchange
+	ctx := context.Background()
+
+	for _, exchange := range cfg.Arbitrage.Exchanges {
+		var wsManager websocket.Manager
+
+		switch exchange {
+		case "binance":
+			wsManager = websocket.NewBinanceManager()
+		case "bybit":
+			// TODO: Implement BybitManager
+			log.Printf("⚠️ Bybit WebSocket not implemented yet, skipping")
+			continue
+		case "okx":
+			// TODO: Implement OKXManager
+			log.Printf("⚠️ OKX WebSocket not implemented yet, skipping")
+			continue
+		default:
+			log.Printf("⚠️ Unknown exchange: %s", exchange)
+			continue
+		}
+
+		// Connect
+		if err := wsManager.Connect(ctx); err != nil {
+			log.Printf("❌ Failed to connect to %s: %v", exchange, err)
+			continue
+		}
+
+		// Subscribe to pairs
+		for _, pair := range cfg.Arbitrage.Pairs {
+			if err := wsManager.Subscribe(pair); err != nil {
+				log.Printf("⚠️ Failed to subscribe to %s on %s: %v", pair, exchange, err)
+			}
+		}
+
+		// Register with OrderBook Manager
+		obManager.RegisterExchange(exchange, wsManager)
+		log.Printf("✅ Connected to %s WebSocket (%d pairs)", exchange, len(cfg.Arbitrage.Pairs))
+	}
+
+	// Create Calculator
+	calculator := arbitrage.NewCalculator()
+
+	// Create Deduplicator
+	deduplicator := arbitrage.NewDeduplicator(time.Duration(cfg.Arbitrage.DeduplicateTTL) * time.Minute)
+
+	// Create Detector
+	detector := arbitrage.NewDetector(
+		obManager,
+		calculator,
+		deduplicator,
+		arbRepo,
+		cfg.Arbitrage.MinProfitPercent,
+		cfg.Arbitrage.MinVolume24h,
+		cfg.Arbitrage.MaxSpreadPercent,
+		cfg.Arbitrage.MaxSlippage,
+	)
+
+	// Wire detector callbacks to notification system
+	detector.OnArbitrageDetected(func(arb *models.ArbitrageOpportunity) {
+		log.Printf("🔥 Arbitrage detected: %s (%.2f%% profit)", arb.Pair, arb.NetProfitPercent)
+
+		// Create notifications for premium users
+		// TODO: Implement CreateArbitrageNotifications in notification service
+		// For now, just log
+		log.Printf("📢 Would create notifications for arbitrage: %s", arb.ExternalID)
+	})
+
+	// Start detector
+	detector.Start()
+
+	log.Printf("✅ Arbitrage monitoring started")
+	log.Printf("   Pairs: %v", cfg.Arbitrage.Pairs)
+	log.Printf("   Exchanges: %v", cfg.Arbitrage.Exchanges)
+	log.Printf("   Min Profit: %.2f%%", cfg.Arbitrage.MinProfitPercent)
+
+	return detector
 }

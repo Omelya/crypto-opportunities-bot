@@ -29,3 +29,31 @@ payment:
   webhook_url: "http://localhost:8081/webhook/monobank"
   redirect_url: "https://t.me/your_bot_username"
   webhook_port: "8081"
+
+arbitrage:
+  enabled: true
+  pairs:
+    - "BTC/USDT"
+    - "ETH/USDT"
+    - "BNB/USDT"
+    - "SOL/USDT"
+    - "XRP/USDT"
+    - "ADA/USDT"
+    - "AVAX/USDT"
+    - "DOT/USDT"
+    - "MATIC/USDT"
+    - "LINK/USDT"
+    - "UNI/USDT"
+    - "ATOM/USDT"
+    - "LTC/USDT"
+    - "BCH/USDT"
+    - "NEAR/USDT"
+  exchanges:
+    - "binance"
+    - "bybit"
+    - "okx"
+  min_profit_percent: 0.3    # Minimum 0.3% net profit after fees
+  min_volume_24h: 100000     # Minimum $100K daily volume
+  max_spread_percent: 5.0    # Maximum 5% spread to consider
+  max_slippage: 0.5          # Maximum 0.5% slippage
+  deduplicate_ttl: 3         # Deduplicate window in minutes

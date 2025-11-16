@@ -15,6 +15,7 @@ type UserRepository interface {
 	Delete(id uint) error
 	List(offset, limit int) ([]*models.User, error)
 	Count() (int64, error)
+	CountPremium() (int64, error)
 }
 
 type UserRepositoryImpl struct {
@@ -74,6 +75,18 @@ func (u *UserRepositoryImpl) List(offset, limit int) ([]*models.User, error) {
 func (u *UserRepositoryImpl) Count() (int64, error) {
 	var count int64
 	err := u.db.Model(&models.User{}).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func (u *UserRepositoryImpl) CountPremium() (int64, error) {
+	var count int64
+	err := u.db.Model(&models.User{}).
+		Where("subscription_tier = ? AND subscription_expires_at > ?", "premium", "NOW()").
+		Count(&count).Error
 	if err != nil {
 		return 0, err
 	}

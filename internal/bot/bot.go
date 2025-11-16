@@ -17,6 +17,7 @@ type Bot struct {
 	oppRepo           repository.OpportunityRepository
 	actionRepo        repository.UserActionRepository
 	subsRepo          repository.SubscriptionRepository
+	arbRepo           repository.ArbitrageRepository
 	paymentService    *payment.Service
 	config            *config.Config
 	onboardingManager *OnboardingManager
@@ -29,6 +30,7 @@ func NewBot(
 	oppRepo repository.OpportunityRepository,
 	actionRepo repository.UserActionRepository,
 	subsRepo repository.SubscriptionRepository,
+	arbRepo repository.ArbitrageRepository,
 	paymentService *payment.Service,
 ) (*Bot, error) {
 	api, err := tgbotapi.NewBotAPI(cfg.Telegram.BotToken)
@@ -47,6 +49,7 @@ func NewBot(
 		oppRepo:           oppRepo,
 		actionRepo:        actionRepo,
 		subsRepo:          subsRepo,
+		arbRepo:           arbRepo,
 		paymentService:    paymentService,
 		config:            cfg,
 		onboardingManager: NewOnboardingManager(),
@@ -100,6 +103,8 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 		b.handleBuyPremium(message)
 	case CommandSubscription:
 		b.handleSubscription(message)
+	case CommandArbitrage:
+		b.handleArbitrage(message)
 	case CommandSupport:
 		b.handleSupport(message)
 	default:
@@ -125,6 +130,11 @@ func (b *Bot) handleCallback(callback *tgbotapi.CallbackQuery) {
 		b.sendMessage(tgbotapi.NewCallback(callback.ID, "Оплату скасовано"))
 		deleteMsg := tgbotapi.NewDeleteMessage(callback.Message.Chat.ID, callback.Message.MessageID)
 		b.sendMessage(deleteMsg)
+		return
+	}
+
+	if data == "refresh_arbitrage" {
+		b.handleArbitrageRefresh(callback)
 		return
 	}
 

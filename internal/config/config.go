@@ -11,11 +11,12 @@ import (
 )
 
 type Config struct {
-	App      AppConfig      `yaml:"app" mapstructure:"app"`
-	Telegram TelegramConfig `yaml:"telegram" mapstructure:"telegram"`
-	Database DatabaseConfig `yaml:"database" mapstructure:"database"`
-	Redis    RedisConfig    `yaml:"redis" mapstructure:"redis"`
-	Payment  PaymentConfig  `yaml:"payment" mapstructure:"payment"`
+	App       AppConfig       `yaml:"app" mapstructure:"app"`
+	Telegram  TelegramConfig  `yaml:"telegram" mapstructure:"telegram"`
+	Database  DatabaseConfig  `yaml:"database" mapstructure:"database"`
+	Redis     RedisConfig     `yaml:"redis" mapstructure:"redis"`
+	Payment   PaymentConfig   `yaml:"payment" mapstructure:"payment"`
+	Arbitrage ArbitrageConfig `yaml:"arbitrage" mapstructure:"arbitrage"`
 }
 
 type AppConfig struct {
@@ -59,6 +60,17 @@ type PaymentConfig struct {
 	WebhookURL        string `yaml:"webhook_url" mapstructure:"webhook_url"`
 	RedirectURL       string `yaml:"redirect_url" mapstructure:"redirect_url"`
 	WebhookPort       string `yaml:"webhook_port" mapstructure:"webhook_port"`
+}
+
+type ArbitrageConfig struct {
+	Enabled           bool     `yaml:"enabled" mapstructure:"enabled"`
+	Pairs             []string `yaml:"pairs" mapstructure:"pairs"`
+	Exchanges         []string `yaml:"exchanges" mapstructure:"exchanges"`
+	MinProfitPercent  float64  `yaml:"min_profit_percent" mapstructure:"min_profit_percent"`
+	MinVolume24h      float64  `yaml:"min_volume_24h" mapstructure:"min_volume_24h"`
+	MaxSpreadPercent  float64  `yaml:"max_spread_percent" mapstructure:"max_spread_percent"`
+	MaxSlippage       float64  `yaml:"max_slippage" mapstructure:"max_slippage"`
+	DeduplicateTTL    int      `yaml:"deduplicate_ttl" mapstructure:"deduplicate_ttl"` // minutes
 }
 
 func LoadConfig(configPath string) (*Config, error) {
@@ -191,6 +203,16 @@ func (c *Config) SafeString() string {
 			Webhook URL: %s
 			Webhook Port: %s
 			Redirect URL: %s
+
+		Arbitrage:
+			Enabled: %t
+			Pairs: %v
+			Exchanges: %v
+			Min Profit: %.2f%%
+			Min Volume: $%.0f
+			Max Spread: %.2f%%
+			Max Slippage: %.2f%%
+			Deduplicate TTL: %d min
 		`,
 		c.App.Environment,
 		c.App.Port,
@@ -211,6 +233,14 @@ func (c *Config) SafeString() string {
 		c.Payment.WebhookURL,
 		c.Payment.WebhookPort,
 		c.Payment.RedirectURL,
+		c.Arbitrage.Enabled,
+		c.Arbitrage.Pairs,
+		c.Arbitrage.Exchanges,
+		c.Arbitrage.MinProfitPercent,
+		c.Arbitrage.MinVolume24h,
+		c.Arbitrage.MaxSpreadPercent,
+		c.Arbitrage.MaxSlippage,
+		c.Arbitrage.DeduplicateTTL,
 	)
 }
 

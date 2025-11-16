@@ -11,6 +11,7 @@ const (
 	CommandBuyPremium   = "buy_premium"
 	CommandSubscription = "subscription"
 	CommandSupport      = "support"
+	CommandArbitrage    = "arbitrage"
 )
 
 // Callback data для inline buttons
