@@ -16,6 +16,7 @@ type Service struct {
 	userRepo  repository.UserRepository
 	prefsRepo repository.UserPreferencesRepository
 	oppRepo   repository.OpportunityRepository
+	arbRepo   repository.ArbitrageRepository
 	formatter *Formatter
 	filter    *Filter
 }
@@ -26,6 +27,7 @@ func NewService(
 	userRepo repository.UserRepository,
 	prefsRepo repository.UserPreferencesRepository,
 	oppRepo repository.OpportunityRepository,
+	arbRepo repository.ArbitrageRepository,
 ) *Service {
 	return &Service{
 		bot:       bot,
@@ -33,6 +35,7 @@ func NewService(
 		userRepo:  userRepo,
 		prefsRepo: prefsRepo,
 		oppRepo:   oppRepo,
+		arbRepo:   arbRepo,
 		formatter: NewFormatter(),
 		filter:    NewFilter(),
 	}
@@ -112,6 +115,73 @@ func (s *Service) CreateOpportunityNotifications(opp *models.Opportunity) error 
 	}
 
 	log.Printf("Created %d notifications for opportunity: %s", created, opp.Title)
+	return nil
+}
+
+// CreateArbitrageNotifications створює notification для арбітражної можливості (Premium only)
+func (s *Service) CreateArbitrageNotifications(arb *models.ArbitrageOpportunity) error {
+	log.Printf("Creating arbitrage notifications for: %s (%.2f%% profit)", arb.Pair, arb.NetProfitPercent)
+
+	// Get all premium users
+	users, err := s.userRepo.List(0, 10000)
+	if err != nil {
+		return fmt.Errorf("failed to get users: %w", err)
+	}
+
+	created := 0
+
+	for _, user := range users {
+		// Only Premium users get arbitrage notifications
+		if !user.IsPremium() {
+			continue
+		}
+
+		prefs, err := s.prefsRepo.GetByUserID(user.ID)
+		if err != nil {
+			log.Printf("Failed to get preferences for user %d: %v", user.ID, err)
+			continue
+		}
+
+		if prefs == nil {
+			log.Printf("No preferences for user %d, skipping", user.ID)
+			continue
+		}
+
+		// Check if user wants instant notifications
+		if !prefs.NotifyInstant {
+			continue
+		}
+
+		// Format arbitrage message
+		message := s.formatter.FormatArbitrage(arb)
+
+		// Premium users get instant notifications (no delay)
+		notification := &models.Notification{
+			UserID:       user.ID,
+			Type:         "arbitrage",
+			Priority:     "high",
+			Status:       models.NotificationStatusPending,
+			Message:      message,
+			ScheduledFor: nil, // Instant
+			MessageData: models.JSONMap{
+				"arbitrage_id":   arb.ID,
+				"pair":           arb.Pair,
+				"exchange_buy":   arb.ExchangeBuy,
+				"exchange_sell":  arb.ExchangeSell,
+				"net_profit":     arb.NetProfitPercent,
+				"profit_usd":     arb.NetProfitUSD,
+			},
+		}
+
+		if err := s.notifRepo.Create(notification); err != nil {
+			log.Printf("Failed to create arbitrage notification for user %d: %v", user.ID, err)
+			continue
+		}
+
+		created++
+	}
+
+	log.Printf("Created %d arbitrage notifications for: %s", created, arb.Pair)
 	return nil
 }
 

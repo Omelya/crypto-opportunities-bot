@@ -139,7 +139,45 @@ func (f *Formatter) FormatPremiumTeaser(missedOpportunities int) string {
 	return builder.String()
 }
 
-// FormatArbitrageAlert форматує арбітражний алерт (Premium)
+// FormatArbitrage форматує арбітражну можливість з моделі
+func (f *Formatter) FormatArbitrage(arb *models.ArbitrageOpportunity) string {
+	var builder strings.Builder
+
+	emoji := "💰"
+	if arb.NetProfitPercent >= 1.0 {
+		emoji = "🔥🔥"
+	} else if arb.NetProfitPercent >= 0.5 {
+		emoji = "🔥"
+	}
+
+	builder.WriteString(fmt.Sprintf("%s <b>АРБІТРАЖ!</b>\n\n", emoji))
+	builder.WriteString(fmt.Sprintf("Пара: <b>%s</b>\n", arb.Pair))
+	builder.WriteString(fmt.Sprintf("🟢 Купити: <b>%s</b> @ $%.4f\n", strings.Title(arb.ExchangeBuy), arb.PriceBuy))
+	builder.WriteString(fmt.Sprintf("🔴 Продати: <b>%s</b> @ $%.4f\n\n", strings.Title(arb.ExchangeSell), arb.PriceSell))
+
+	builder.WriteString(fmt.Sprintf("💵 Валовий profit: <b>%.2f%%</b>\n", arb.ProfitPercent))
+	builder.WriteString(fmt.Sprintf("📊 На $1000: <b>$%.2f</b>\n", arb.ProfitUSD))
+	builder.WriteString(fmt.Sprintf("💼 Рекомендовано: <b>$%.0f-%.0f</b>\n\n", arb.MinTradeAmount, arb.RecommendedAmount))
+
+	builder.WriteString(fmt.Sprintf("⚠️ Trading fees: <b>-%.2f%%</b>\n", arb.TotalFeesPercent))
+	builder.WriteString(fmt.Sprintf("📉 Slippage: <b>-%.2f%%</b>\n", arb.SlippageBuy+arb.SlippageSell))
+	builder.WriteString(fmt.Sprintf("✅ Чистий profit: <b>%.2f%%</b> (<b>$%.2f</b> на $1000)\n\n",
+		arb.NetProfitPercent, arb.NetProfitUSD))
+
+	// Time left
+	timeLeft := arb.TimeLeft()
+	minutesLeft := int(timeLeft.Minutes())
+	if minutesLeft < 0 {
+		minutesLeft = 0
+	}
+	builder.WriteString(fmt.Sprintf("⏰ Залишилось: ~%d хв\n", minutesLeft))
+
+	builder.WriteString("\n⚠️ <i>Це інформація, не гарантія прибутку. Ціни змінюються швидко.</i>")
+
+	return builder.String()
+}
+
+// FormatArbitrageAlert форматує арбітражний алерт (Premium) - legacy
 func (f *Formatter) FormatArbitrageAlert(exchangeBuy, exchangeSell, pair string,
 	priceBuy, priceSell, profitPercent, netProfitPercent float64) string {
 
