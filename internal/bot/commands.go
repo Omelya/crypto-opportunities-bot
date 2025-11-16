@@ -2,13 +2,15 @@ package bot
 
 // Command константи
 const (
-	CommandStart    = "start"
-	CommandHelp     = "help"
-	CommandToday    = "today"
-	CommandSettings = "settings"
-	CommandStats    = "stats"
-	CommandPremium  = "premium"
-	CommandSupport  = "support"
+	CommandStart        = "start"
+	CommandHelp         = "help"
+	CommandToday        = "today"
+	CommandSettings     = "settings"
+	CommandStats        = "stats"
+	CommandPremium      = "premium"
+	CommandBuyPremium   = "buy_premium"
+	CommandSubscription = "subscription"
+	CommandSupport      = "support"
 )
 
 // Callback data для inline buttons
@@ -26,9 +28,10 @@ const (
 	CallbackRiskMedium = "risk_medium"
 	CallbackRiskHigh   = "risk_high"
 
-	CallbackPremiumTry = "premium_try"
-	CallbackPremiumBuy = "premium_buy"
-	CallbackStayFree   = "stay_free"
+	CallbackPremiumTry     = "premium:premium_weekly"
+	CallbackPremiumMonthly = "premium:premium_monthly"
+	CallbackPremiumYearly  = "premium:premium_yearly"
+	CallbackStayFree       = "stay_free"
 
 	CallbackSkipCapital = "skip_capital"
 

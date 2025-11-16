@@ -2,6 +2,7 @@ package bot
 
 import (
 	"crypto-opportunities-bot/internal/config"
+	"crypto-opportunities-bot/internal/payment"
 	"crypto-opportunities-bot/internal/repository"
 	"log"
 	"strings"
@@ -15,6 +16,8 @@ type Bot struct {
 	prefsRepo         repository.UserPreferencesRepository
 	oppRepo           repository.OpportunityRepository
 	actionRepo        repository.UserActionRepository
+	subsRepo          repository.SubscriptionRepository
+	paymentService    *payment.Service
 	config            *config.Config
 	onboardingManager *OnboardingManager
 }
@@ -25,6 +28,8 @@ func NewBot(
 	prefsRepo repository.UserPreferencesRepository,
 	oppRepo repository.OpportunityRepository,
 	actionRepo repository.UserActionRepository,
+	subsRepo repository.SubscriptionRepository,
+	paymentService *payment.Service,
 ) (*Bot, error) {
 	api, err := tgbotapi.NewBotAPI(cfg.Telegram.BotToken)
 	if err != nil {
@@ -36,13 +41,15 @@ func NewBot(
 	log.Printf("Authorized on account %s", api.Self.UserName)
 
 	return &Bot{
-		api,
-		userRepo,
-		prefsRepo,
-		oppRepo,
-		actionRepo,
-		cfg,
-		NewOnboardingManager(),
+		api:               api,
+		userRepo:          userRepo,
+		prefsRepo:         prefsRepo,
+		oppRepo:           oppRepo,
+		actionRepo:        actionRepo,
+		subsRepo:          subsRepo,
+		paymentService:    paymentService,
+		config:            cfg,
+		onboardingManager: NewOnboardingManager(),
 	}, nil
 }
 
@@ -89,6 +96,10 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 		b.handleStats(message)
 	case CommandPremium:
 		b.handlePremium(message)
+	case CommandBuyPremium:
+		b.handleBuyPremium(message)
+	case CommandSubscription:
+		b.handleSubscription(message)
 	case CommandSupport:
 		b.handleSupport(message)
 	default:
@@ -97,12 +108,30 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 }
 
 func (b *Bot) handleCallback(callback *tgbotapi.CallbackQuery) {
-	_, err := b.api.Send(tgbotapi.NewCallback(callback.ID, callback.Data))
+	data := callback.Data
+
+	// Premium callbacks
+	if strings.HasPrefix(data, "premium:") {
+		b.handlePremiumCallback(callback)
+		return
+	}
+
+	if data == "cancel_subscription" {
+		b.handleCancelSubscription(callback)
+		return
+	}
+
+	if data == "cancel_payment" {
+		b.sendMessage(tgbotapi.NewCallback(callback.ID, "Оплату скасовано"))
+		deleteMsg := tgbotapi.NewDeleteMessage(callback.Message.Chat.ID, callback.Message.MessageID)
+		b.sendMessage(deleteMsg)
+		return
+	}
+
+	_, err := b.api.Send(tgbotapi.NewCallback(callback.ID, ""))
 	if err != nil {
 		log.Println(err)
 	}
-
-	data := callback.Data
 
 	// Menu callbacks
 	if strings.HasPrefix(data, "menu_") {

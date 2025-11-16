@@ -173,6 +173,38 @@ func (b *Bot) handleSettings(message *tgbotapi.Message) {
 }
 
 func (b *Bot) handlePremium(message *tgbotapi.Message) {
+	chatID := message.Chat.ID
+	userID := message.From.ID
+
+	user, err := b.userRepo.GetByTelegramID(userID)
+	if err != nil || user == nil {
+		b.sendError(chatID)
+
+		return
+	}
+
+	if user.IsPremium() {
+		text := fmt.Sprintf(
+			"💎 У тебе вже є Premium підписка!\n\n"+
+				"Активна до: %s\n"+
+				"Залишилось: %d днів\n\n"+
+				"Хочеш керувати підпискою? /subscription",
+			user.SubscriptionExpiresAt.Format("02.01.2006"),
+			b.daysUntil(*user.SubscriptionExpiresAt),
+		)
+
+		msg := tgbotapi.NewMessage(chatID, text)
+		msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("⬅️ Головне меню", CallbackMenuAll),
+			),
+		)
+
+		b.sendMessage(msg)
+
+		return
+	}
+
 	text := `
 💎 Premium підписка
 
@@ -184,7 +216,6 @@ func (b *Bot) handlePremium(message *tgbotapi.Message) {
 🔥 DeFi та китові алерти
 
 ✨ Перші 7 днів - безкоштовно
-💵 Потім: $9/місяць
 
 Користувачі в середньому заробляють $150-300/міс
 завдяки Premium функціям.

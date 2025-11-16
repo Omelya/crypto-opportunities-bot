@@ -2,6 +2,7 @@ package bot
 
 import (
 	"crypto-opportunities-bot/internal/models"
+	"crypto-opportunities-bot/internal/payment/monobank"
 	"fmt"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -62,7 +63,10 @@ func (b *Bot) buildPremiumKeyboard() tgbotapi.InlineKeyboardMarkup {
 			tgbotapi.NewInlineKeyboardButtonData("🚀 Спробувати 7 днів", CallbackPremiumTry),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("💳 Підписатись ($9/міс)", CallbackPremiumBuy),
+			tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("💎 Місячна - %d UAH", monobank.PlanPrices[monobank.PlanPremiumMonthly]/100), CallbackPremiumMonthly),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("👑 Річна - %d UAH (знижка 16%%)", monobank.PlanPrices[monobank.PlanPremiumYearly]/100), CallbackPremiumYearly),
 		),
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("⬅️ Назад", CallbackMenuAll),
@@ -125,17 +129,6 @@ func (b *Bot) buildOpportunitiesKeyboard(selected ...string) tgbotapi.InlineKeyb
 				"➡️ Продовжити",
 				CallbackOppComplete,
 			),
-		),
-	)
-}
-
-func (b *Bot) buildPremiumOfferKeyboard() tgbotapi.InlineKeyboardMarkup {
-	return tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🚀 Спробувати Premium", CallbackPremiumTry),
-		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("Залишитись на Free", CallbackStayFree),
 		),
 	)
 }
@@ -209,7 +202,7 @@ func (b *Bot) buildOpportunitiesFilterKeyboard(currentFilter string, hasPaginati
 }
 
 func (b *Bot) buildOpportunityDetailKeyboard(opp *models.Opportunity) tgbotapi.InlineKeyboardMarkup {
-	rows := [][]tgbotapi.InlineKeyboardButton{}
+	var rows [][]tgbotapi.InlineKeyboardButton
 
 	if opp.URL != "" {
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
