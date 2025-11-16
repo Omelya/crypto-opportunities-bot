@@ -24,3 +24,8 @@ redis:
   db: 0
 
 payment:
+  monobank_token: ""
+  monobank_public_key: ""
+  webhook_url: "http://localhost:8081/webhook/monobank"
+  redirect_url: "https://t.me/your_bot_username"
+  webhook_port: "8081"

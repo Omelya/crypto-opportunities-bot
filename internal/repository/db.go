@@ -56,6 +56,8 @@ func AutoMigrate(db *gorm.DB) error {
 		&models.Opportunity{},
 		&models.Notification{},
 		&models.UserAction{},
+		&models.Subscription{},
+		&models.Payment{},
 	)
 }
 

@@ -2,13 +2,15 @@ package bot
 
 // Command константи
 const (
-	CommandStart    = "start"
-	CommandHelp     = "help"
-	CommandToday    = "today"
-	CommandSettings = "settings"
-	CommandStats    = "stats"
-	CommandPremium  = "premium"
-	CommandSupport  = "support"
+	CommandStart        = "start"
+	CommandHelp         = "help"
+	CommandToday        = "today"
+	CommandSettings     = "settings"
+	CommandStats        = "stats"
+	CommandPremium      = "premium"
+	CommandBuyPremium   = "buy_premium"
+	CommandSubscription = "subscription"
+	CommandSupport      = "support"
 )
 
 // Callback data для inline buttons

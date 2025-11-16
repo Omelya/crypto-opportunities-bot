@@ -5,6 +5,7 @@ import (
 	"crypto-opportunities-bot/internal/config"
 	"crypto-opportunities-bot/internal/models"
 	"crypto-opportunities-bot/internal/notification"
+	"crypto-opportunities-bot/internal/payment"
 	"crypto-opportunities-bot/internal/repository"
 	"crypto-opportunities-bot/internal/scraper"
 	"log"
@@ -51,6 +52,8 @@ func main() {
 	oppRepo := repository.NewOpportunityRepository(db)
 	notifRepo := repository.NewNotificationRepository(db)
 	actionRepo := repository.NewUserActionRepository(db)
+	subsRepo := repository.NewSubscriptionRepository(db)
+	paymentRepo := repository.NewPaymentRepository(db)
 
 	botAPI, err := tgbotapi.NewBotAPI(cfg.Telegram.BotToken)
 	if err != nil {
@@ -67,6 +70,40 @@ func main() {
 		oppRepo,
 	)
 	log.Printf("✅ Notification service initialized")
+
+	// Payment service (Monobank)
+	var paymentService *payment.Service
+	var webhookHandler *payment.WebhookHandler
+
+	if cfg.Payment.MonobankToken != "" {
+		paymentCfg := &payment.Config{
+			MonobankToken: cfg.Payment.MonobankToken,
+			WebhookURL:    cfg.Payment.WebhookURL,
+			RedirectURL:   cfg.Payment.RedirectURL,
+		}
+
+		paymentService = payment.NewService(paymentCfg, subsRepo, paymentRepo, userRepo)
+		log.Printf("✅ Payment service initialized (Monobank)")
+
+		// Webhook handler
+		webhookHandler = payment.NewWebhookHandler(paymentService, cfg.Payment.MonobankPublicKey)
+
+		// Start webhook server у окремій go routine
+		if cfg.Payment.WebhookPort != "" {
+			go func() {
+				log.Printf("🌐 Starting webhook server on port %s...", cfg.Payment.WebhookPort)
+				if err := payment.StartWebhookServer(webhookHandler, cfg.Payment.WebhookPort); err != nil {
+					log.Printf("⚠️ Webhook server error: %v", err)
+				}
+			}()
+		}
+
+		// Subscription expiration checker
+		subscriptionTicker := startSubscriptionChecker(paymentService)
+		defer subscriptionTicker.Stop()
+	} else {
+		log.Printf("⚠️ Monobank not configured - payment features disabled")
+	}
 
 	scraperService := scraper.NewScraperService(oppRepo)
 	scraperService.RegisterScraper(scraper.NewBinanceScraper())
@@ -103,7 +140,7 @@ func main() {
 	log.Printf("✅ Daily digest scheduler started")
 	defer digestScheduler.Stop()
 
-	telegramBot, err := bot.NewBot(cfg, userRepo, prefsRepo, oppRepo, actionRepo)
+	telegramBot, err := bot.NewBot(cfg, userRepo, prefsRepo, oppRepo, actionRepo, subsRepo, paymentService)
 	if err != nil {
 		log.Fatalf("Failed to create bot: %v", err)
 	}
@@ -144,5 +181,27 @@ func startNotificationDispatcher(service *notification.Service) *time.Ticker {
 	}()
 
 	log.Println("✅ Notification dispatcher started (every 10s)")
+	return ticker
+}
+
+func startSubscriptionChecker(service *payment.Service) *time.Ticker {
+	ticker := time.NewTicker(1 * time.Hour)
+
+	// Перевірка при запуску
+	go func() {
+		if err := service.CheckExpiredSubscriptions(); err != nil {
+			log.Printf("Subscription checker error: %v", err)
+		}
+	}()
+
+	go func() {
+		for range ticker.C {
+			if err := service.CheckExpiredSubscriptions(); err != nil {
+				log.Printf("Subscription checker error: %v", err)
+			}
+		}
+	}()
+
+	log.Println("✅ Subscription checker started (every 1h)")
 	return ticker
 }
