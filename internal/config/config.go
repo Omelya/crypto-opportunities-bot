@@ -48,9 +48,17 @@ type RedisConfig struct {
 }
 
 type PaymentConfig struct {
+	// Stripe (deprecated, використовуємо Monobank)
 	StripeSecretKey      string `yaml:"stripe_secret_key" mapstructure:"stripe_secret_key"`
 	StripePublishableKey string `yaml:"stripe_publishable_key" mapstructure:"stripe_publishable_key"`
 	StripeWebhookSecret  string `yaml:"stripe_webhook_secret" mapstructure:"stripe_webhook_secret"`
+
+	// Monobank
+	MonobankToken     string `yaml:"monobank_token" mapstructure:"monobank_token"`
+	MonobankPublicKey string `yaml:"monobank_public_key" mapstructure:"monobank_public_key"`
+	WebhookURL        string `yaml:"webhook_url" mapstructure:"webhook_url"`
+	RedirectURL       string `yaml:"redirect_url" mapstructure:"redirect_url"`
+	WebhookPort       string `yaml:"webhook_port" mapstructure:"webhook_port"`
 }
 
 func LoadConfig(configPath string) (*Config, error) {
@@ -81,9 +89,18 @@ func LoadConfig(configPath string) (*Config, error) {
 	config.Database.DBName = getEnv("DB_NAME", config.Database.DBName)
 	config.Database.Port = getEnv("DB_PORT", config.Database.Port)
 	config.Redis.Password = getEnv("REDIS_PASSWORD", config.Redis.Password)
+
+	// Stripe (deprecated)
 	config.Payment.StripePublishableKey = getEnv("STRIPE_PUBLISHABLE_KEY", config.Payment.StripePublishableKey)
 	config.Payment.StripeWebhookSecret = getEnv("STRIPE_WEBHOOK_SECRET", config.Payment.StripeWebhookSecret)
 	config.Payment.StripeSecretKey = getEnv("STRIPE_SECRET_KEY", config.Payment.StripeSecretKey)
+
+	// Monobank
+	config.Payment.MonobankToken = getEnv("MONOBANK_TOKEN", config.Payment.MonobankToken)
+	config.Payment.MonobankPublicKey = getEnv("MONOBANK_PUBLIC_KEY", config.Payment.MonobankPublicKey)
+	config.Payment.WebhookURL = getEnv("PAYMENT_WEBHOOK_URL", config.Payment.WebhookURL)
+	config.Payment.RedirectURL = getEnv("PAYMENT_REDIRECT_URL", config.Payment.RedirectURL)
+	config.Payment.WebhookPort = getEnv("PAYMENT_WEBHOOK_PORT", config.Payment.WebhookPort)
 
 	err := config.Validate()
 	if err != nil {
@@ -127,16 +144,20 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("telegram.webhook_url is required")
 		}
 
-		if c.Payment.StripeSecretKey == "" {
-			return fmt.Errorf("payment.stripe_secret_key is required")
+		// Monobank обов'язковий для production
+		if c.Payment.MonobankToken == "" {
+			return fmt.Errorf("payment.monobank_token is required for production")
 		}
 
-		if c.Payment.StripePublishableKey == "" {
-			return fmt.Errorf("payment.stripe_publishable_key is required")
+		if c.Payment.WebhookURL == "" {
+			return fmt.Errorf("payment.webhook_url is required for production")
 		}
+	}
 
-		if c.Payment.StripeWebhookSecret == "" {
-			return fmt.Errorf("payment.stripe_webhook_secret is required")
+	// Для development теж потрібен Monobank token якщо хочемо тестувати
+	if c.App.Environment == "development" && c.Payment.MonobankToken != "" {
+		if c.Payment.WebhookPort == "" {
+			c.Payment.WebhookPort = "8081" // Default webhook port
 		}
 	}
 
@@ -153,20 +174,23 @@ func (c *Config) SafeString() string {
 			Bot Token: %s
 			Webhook: %s
 			Debug: %t
-		  
+
 		Database:
 			Host: %s:%s
 			User: %s
 			Database: %s
 			SSL Mode: %s
 			Max Connections: %d
-		  
+
 		Redis:
 			Host: %s:%s
 			Database: %d
-		  
-		Payment (Stripe):
-			Keys Configured: %t
+
+		Payment (Monobank):
+			Token: %s
+			Webhook URL: %s
+			Webhook Port: %s
+			Redirect URL: %s
 		`,
 		c.App.Environment,
 		c.App.Port,
@@ -183,7 +207,10 @@ func (c *Config) SafeString() string {
 		c.Redis.Host,
 		c.Redis.Port,
 		c.Redis.DB,
-		c.Payment.StripeSecretKey != "",
+		maskSecret(c.Payment.MonobankToken),
+		c.Payment.WebhookURL,
+		c.Payment.WebhookPort,
+		c.Payment.RedirectURL,
 	)
 }
 
