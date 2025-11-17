@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -101,7 +100,7 @@ func (m *BinanceManager) Subscribe(symbols []string) error {
 	}
 
 	// Create subscription message
-	streams := []string{}
+	var streams []string
 
 	for _, symbol := range symbols {
 		symbolLower := m.formatSymbol(symbol)
@@ -435,21 +434,4 @@ func (m *BinanceManager) reconnect() {
 	}
 
 	log.Printf("✅ Reconnected to Binance WebSocket")
-}
-
-// parseFloat парсить interface{} в float64
-func parseFloat(val interface{}) float64 {
-	switch v := val.(type) {
-	case string:
-		f, _ := strconv.ParseFloat(v, 64)
-		return f
-	case float64:
-		return v
-	case int:
-		return float64(v)
-	case int64:
-		return float64(v)
-	default:
-		return 0
-	}
 }

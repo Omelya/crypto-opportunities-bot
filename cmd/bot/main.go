@@ -337,12 +337,10 @@ func startArbitrageMonitoring(
 	detector := arbitrage.NewDetector(
 		obManager,
 		calculator,
-		deduplicator,
 		arbRepo,
-		cfg.Arbitrage.MinProfitPercent,
-		cfg.Arbitrage.MinVolume24h,
-		cfg.Arbitrage.MaxSpreadPercent,
-		cfg.Arbitrage.MaxSlippage,
+		userRepo,
+		deduplicator,
+		&cfg.Arbitrage,
 	)
 
 	// Wire detector callbacks to notification system

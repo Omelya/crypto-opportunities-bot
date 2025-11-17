@@ -247,11 +247,11 @@ func (m *BybitManager) handleOrderBookUpdate(message []byte) {
 		Topic string `json:"topic"`
 		Type  string `json:"type"`
 		Data  struct {
-			Symbol string          `json:"s"`
-			Bids   [][]interface{} `json:"b"`
-			Asks   [][]interface{} `json:"a"`
-			UpdateID int64        `json:"u"`
-			Timestamp int64       `json:"t"`
+			Symbol    string          `json:"s"`
+			Bids      [][]interface{} `json:"b"`
+			Asks      [][]interface{} `json:"a"`
+			UpdateID  int64           `json:"u"`
+			Timestamp int64           `json:"t"`
 		} `json:"data"`
 	}
 
@@ -264,11 +264,11 @@ func (m *BybitManager) handleOrderBookUpdate(message []byte) {
 
 	// Create OrderBook
 	ob := &models.OrderBook{
-		Exchange:  "bybit",
-		Symbol:    symbol,
-		Timestamp: time.UnixMilli(update.Data.Timestamp),
-		Bids:      make([]*models.PriceLevel, 0),
-		Asks:      make([]*models.PriceLevel, 0),
+		Exchange:   "bybit",
+		Symbol:     symbol,
+		LastUpdate: time.UnixMilli(update.Data.Timestamp),
+		Bids:       make([]models.PriceLevel, 0),
+		Asks:       make([]models.PriceLevel, 0),
 	}
 
 	// Parse bids
@@ -277,20 +277,15 @@ func (m *BybitManager) handleOrderBookUpdate(message []byte) {
 			continue
 		}
 
-		price, err := parseFloat(bid[0])
-		if err != nil {
-			continue
-		}
+		price := parseFloat(bid[0])
+		quantity := parseFloat(bid[1])
 
-		quantity, err := parseFloat(bid[1])
-		if err != nil {
-			continue
-		}
-
-		ob.Bids = append(ob.Bids, &models.PriceLevel{
+		priceLevel := models.PriceLevel{
 			Price:    price,
 			Quantity: quantity,
-		})
+		}
+
+		ob.Bids = append(ob.Bids, priceLevel)
 	}
 
 	// Parse asks
@@ -299,17 +294,10 @@ func (m *BybitManager) handleOrderBookUpdate(message []byte) {
 			continue
 		}
 
-		price, err := parseFloat(ask[0])
-		if err != nil {
-			continue
-		}
+		price := parseFloat(ask[0])
+		quantity := parseFloat(ask[1])
 
-		quantity, err := parseFloat(ask[1])
-		if err != nil {
-			continue
-		}
-
-		ob.Asks = append(ob.Asks, &models.PriceLevel{
+		ob.Asks = append(ob.Asks, models.PriceLevel{
 			Price:    price,
 			Quantity: quantity,
 		})
@@ -331,11 +319,11 @@ func (m *BybitManager) handleTickerUpdate(message []byte) {
 	var update struct {
 		Topic string `json:"topic"`
 		Data  struct {
-			Symbol       string `json:"symbol"`
-			LastPrice    string `json:"lastPrice"`
-			Volume24h    string `json:"volume24h"`
-			TurnOver24h  string `json:"turnover24h"`
-			PriceChange  string `json:"price24hPcnt"`
+			Symbol      string `json:"symbol"`
+			LastPrice   string `json:"lastPrice"`
+			Volume24h   string `json:"volume24h"`
+			TurnOver24h string `json:"turnover24h"`
+			PriceChange string `json:"price24hPcnt"`
 		} `json:"data"`
 	}
 
@@ -348,10 +336,21 @@ func (m *BybitManager) handleTickerUpdate(message []byte) {
 
 	if m.onTicker != nil {
 		// Parse values
-		lastPrice, _ := parseFloat(update.Data.LastPrice)
-		volume24h, _ := parseFloat(update.Data.TurnOver24h) // Turnover in USDT
+		lastPrice := parseFloat(update.Data.LastPrice)
+		volume24h := parseFloat(update.Data.Volume24h) // Turnover in USDT
+		priceChange := parseFloat(update.Data.PriceChange)
+		priceChange24h := parseFloat(update.Data.TurnOver24h)
 
-		m.onTicker("bybit", symbol, lastPrice, volume24h)
+		tickerData := &TickerData{
+			Symbol:         symbol,
+			LastPrice:      lastPrice,
+			Volume24h:      volume24h * lastPrice,
+			PriceChange:    priceChange,
+			PriceChange24h: priceChange24h,
+			Timestamp:      time.Time{},
+		}
+
+		m.onTicker("bybit", symbol, tickerData)
 	}
 }
 
@@ -413,7 +412,10 @@ func (m *BybitManager) watchConnection() {
 				// If more than 50% orderbooks are stale, reconnect
 				if total > 0 && staleCount > total/2 {
 					log.Printf("⚠️ Bybit: %d/%d orderbooks stale, reconnecting...", staleCount, total)
-					m.reconnect()
+					err := m.reconnect()
+					if err != nil {
+						log.Print(err)
+					}
 				}
 			}
 		}
@@ -422,7 +424,11 @@ func (m *BybitManager) watchConnection() {
 
 // reconnect перепідключається до WebSocket
 func (m *BybitManager) reconnect() error {
-	m.Disconnect()
+	err := m.Disconnect()
+	if err != nil {
+		log.Print(err)
+	}
+
 	time.Sleep(2 * time.Second)
 
 	if err := m.Connect(m.ctx); err != nil {
@@ -460,22 +466,4 @@ func denormalizeSymbol(symbol string) string {
 
 	// Fallback: can't determine, return as is
 	return symbol
-}
-
-// parseFloat парсить float значення
-func parseFloat(v interface{}) (float64, error) {
-	switch val := v.(type) {
-	case string:
-		var f float64
-		_, err := fmt.Sscanf(val, "%f", &f)
-		return f, err
-	case float64:
-		return val, nil
-	case int:
-		return float64(val), nil
-	case int64:
-		return float64(val), nil
-	default:
-		return 0, fmt.Errorf("unsupported type: %T", v)
-	}
 }

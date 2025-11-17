@@ -139,7 +139,7 @@ func (b *Bot) handleCallback(callback *tgbotapi.CallbackQuery) {
 		return
 	}
 
-	if data == "refresh_arbitrage" {
+	if data == CallbackRefreshArbitrage {
 		b.handleArbitrageRefresh(callback)
 		return
 	}

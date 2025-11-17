@@ -68,6 +68,7 @@ defi:
     - "Optimism"
     - "Avalanche"
   protocols: []              # Empty = all protocols (filter by APY/TVL instead)
+  amount: 1000
   min_apy: 10.0              # Minimum 10% APY
   min_tvl: 100000            # Minimum $100K TVL for safety
   max_il_risk: 15.0          # Maximum 15% impermanent loss risk

@@ -106,4 +106,7 @@ const (
 	// Settings - Digest
 	CallbackDigestToggle = "digest_toggle"
 	CallbackDigestDone   = "digest_done"
+
+	// Arbitrage
+	CallbackRefreshArbitrage = "refresh_arbitrage"
 )

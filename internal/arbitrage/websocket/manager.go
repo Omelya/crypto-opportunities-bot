@@ -3,6 +3,7 @@ package websocket
 import (
 	"context"
 	"crypto-opportunities-bot/internal/models"
+	"strconv"
 	"time"
 )
 
@@ -44,10 +45,26 @@ type TickerCallback func(exchange, symbol string, ticker *TickerData)
 
 // TickerData дані тікера
 type TickerData struct {
-	Symbol       string
-	LastPrice    float64
-	Volume24h    float64
-	PriceChange  float64
+	Symbol         string
+	LastPrice      float64
+	Volume24h      float64
+	PriceChange    float64
 	PriceChange24h float64
-	Timestamp    time.Time
+	Timestamp      time.Time
+}
+
+func parseFloat(val interface{}) float64 {
+	switch v := val.(type) {
+	case string:
+		f, _ := strconv.ParseFloat(v, 64)
+		return f
+	case float64:
+		return v
+	case int:
+		return float64(v)
+	case int64:
+		return float64(v)
+	default:
+		return 0
+	}
 }

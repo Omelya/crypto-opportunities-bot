@@ -64,25 +64,26 @@ type PaymentConfig struct {
 }
 
 type ArbitrageConfig struct {
-	Enabled           bool     `yaml:"enabled" mapstructure:"enabled"`
-	Pairs             []string `yaml:"pairs" mapstructure:"pairs"`
-	Exchanges         []string `yaml:"exchanges" mapstructure:"exchanges"`
-	MinProfitPercent  float64  `yaml:"min_profit_percent" mapstructure:"min_profit_percent"`
-	MinVolume24h      float64  `yaml:"min_volume_24h" mapstructure:"min_volume_24h"`
-	MaxSpreadPercent  float64  `yaml:"max_spread_percent" mapstructure:"max_spread_percent"`
-	MaxSlippage       float64  `yaml:"max_slippage" mapstructure:"max_slippage"`
-	DeduplicateTTL    int      `yaml:"deduplicate_ttl" mapstructure:"deduplicate_ttl"` // minutes
+	Enabled          bool     `yaml:"enabled" mapstructure:"enabled"`
+	Pairs            []string `yaml:"pairs" mapstructure:"pairs"`
+	Exchanges        []string `yaml:"exchanges" mapstructure:"exchanges"`
+	MinProfitPercent float64  `yaml:"min_profit_percent" mapstructure:"min_profit_percent"`
+	MinVolume24h     float64  `yaml:"min_volume_24h" mapstructure:"min_volume_24h"`
+	MaxSpreadPercent float64  `yaml:"max_spread_percent" mapstructure:"max_spread_percent"`
+	MaxSlippage      float64  `yaml:"max_slippage" mapstructure:"max_slippage"`
+	Amount           float64  `yaml:"amount" mapstructure:"amount"`
+	DeduplicateTTL   int      `yaml:"deduplicate_ttl" mapstructure:"deduplicate_ttl"` // minutes
 }
 
 type DeFiConfig struct {
-	Enabled         bool     `yaml:"enabled" mapstructure:"enabled"`
-	Chains          []string `yaml:"chains" mapstructure:"chains"`
-	Protocols       []string `yaml:"protocols" mapstructure:"protocols"`
-	MinAPY          float64  `yaml:"min_apy" mapstructure:"min_apy"`
-	MinTVL          float64  `yaml:"min_tvl" mapstructure:"min_tvl"`
-	MaxILRisk       float64  `yaml:"max_il_risk" mapstructure:"max_il_risk"`
-	MinVolume24h    float64  `yaml:"min_volume_24h" mapstructure:"min_volume_24h"`
-	ScrapeInterval  int      `yaml:"scrape_interval" mapstructure:"scrape_interval"` // minutes
+	Enabled        bool     `yaml:"enabled" mapstructure:"enabled"`
+	Chains         []string `yaml:"chains" mapstructure:"chains"`
+	Protocols      []string `yaml:"protocols" mapstructure:"protocols"`
+	MinAPY         float64  `yaml:"min_apy" mapstructure:"min_apy"`
+	MinTVL         float64  `yaml:"min_tvl" mapstructure:"min_tvl"`
+	MaxILRisk      float64  `yaml:"max_il_risk" mapstructure:"max_il_risk"`
+	MinVolume24h   float64  `yaml:"min_volume_24h" mapstructure:"min_volume_24h"`
+	ScrapeInterval int      `yaml:"scrape_interval" mapstructure:"scrape_interval"` // minutes
 }
 
 func LoadConfig(configPath string) (*Config, error) {

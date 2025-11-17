@@ -61,6 +61,11 @@ func (b *Bot) sendWelcomeBack(chatID int64, user *models.User) {
 		user.FirstName,
 	)
 
+	if user.IsPremium() {
+		text += "\n/arbitrage - Арбітражні можливості\n"
+		text += "/defi - DeFi можливості"
+	}
+
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ReplyMarkup = b.buildMainMenuKeyboard()
 
@@ -77,6 +82,7 @@ func (b *Bot) handleHelp(message *tgbotapi.Message) {
 /stats - Твоя статистика
 /settings - Налаштування
 /premium - Інформація про Premium
+/arbitrage - Арбітражні можливості
 /support - Зв'язатись з підтримкою
 
 💡 Підказка: Використовуй кнопки меню для швидкого доступу!

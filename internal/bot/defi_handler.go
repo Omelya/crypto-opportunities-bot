@@ -19,9 +19,9 @@ func (b *Bot) handleDeFi(message *tgbotapi.Message) {
 	}
 
 	// Отримати топ DeFi opportunities за APY
-	opportunities, err := b.defiRepo.GetTopByAPY(10) // Топ 10
+	opportunities, err := b.defiRepo.GetTopByAPY(10)
 	if err != nil {
-		b.sendError(message.Chat.ID, "❌ Помилка отримання DeFi можливостей")
+		b.sendError(message.Chat.ID)
 		return
 	}
 
@@ -32,7 +32,7 @@ func (b *Bot) handleDeFi(message *tgbotapi.Message) {
 				"💡 Моніторинг активний, ви отримаєте алерт коли з'явиться можливість!\n\n"+
 				"⏱️ Перевірка відбувається кожні 30 хвилин")
 		msg.ParseMode = "HTML"
-		b.api.Send(msg)
+		b.sendMessage(msg)
 		return
 	}
 
@@ -43,7 +43,7 @@ func (b *Bot) handleDeFi(message *tgbotapi.Message) {
 	msg.ParseMode = "HTML"
 	msg.ReplyMarkup = getDeFiKeyboard()
 
-	b.api.Send(msg)
+	b.sendMessage(msg)
 }
 
 // formatDeFiList форматує список DeFi opportunities
@@ -115,7 +115,7 @@ func getDeFiKeyboard() tgbotapi.InlineKeyboardMarkup {
 		),
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("🔄 Оновити", "refresh_defi"),
-			tgbotapi.NewInlineKeyboardButtonData("« Головне меню", "menu_main"),
+			tgbotapi.NewInlineKeyboardButtonData("⬅️ Головне меню", CallbackMenuAll),
 		),
 	)
 }
@@ -142,18 +142,18 @@ func (b *Bot) sendDeFiPremiumRequired(chatID int64) {
 			tgbotapi.NewInlineKeyboardButtonData("💎 Переглянути Premium", CallbackMenuPremium),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("« Назад", "menu_main"),
+			tgbotapi.NewInlineKeyboardButtonData("⬅️ Назад", CallbackMenuAll),
 		),
 	)
 	msg.ReplyMarkup = keyboard
 
-	b.api.Send(msg)
+	b.sendMessage(msg)
 }
 
 // handleDeFiRefresh обробляє callback для оновлення DeFi opportunities
 func (b *Bot) handleDeFiRefresh(callback *tgbotapi.CallbackQuery) {
 	// Answer callback
-	b.api.Send(tgbotapi.NewCallback(callback.ID, "🔄 Оновлюю..."))
+	b.sendMessage(tgbotapi.NewCallback(callback.ID, "🔄 Оновлюю..."))
 
 	user, _ := b.getUserAndPrefs(callback.From.ID)
 
@@ -166,7 +166,7 @@ func (b *Bot) handleDeFiRefresh(callback *tgbotapi.CallbackQuery) {
 	// Отримати топ DeFi opportunities
 	opportunities, err := b.defiRepo.GetTopByAPY(10)
 	if err != nil {
-		b.sendError(callback.Message.Chat.ID, "❌ Помилка отримання DeFi можливостей")
+		b.sendError(callback.Message.Chat.ID)
 		return
 	}
 
@@ -187,13 +187,13 @@ func (b *Bot) handleDeFiRefresh(callback *tgbotapi.CallbackQuery) {
 	keyboard := getDeFiKeyboard()
 	edit.ReplyMarkup = &keyboard
 
-	b.api.Send(edit)
+	b.sendMessage(edit)
 }
 
 // handleDeFiFilterByRisk обробляє фільтрацію DeFi за рівнем ризику
 func (b *Bot) handleDeFiFilterByRisk(callback *tgbotapi.CallbackQuery, riskLevel string) {
 	// Answer callback
-	b.api.Send(tgbotapi.NewCallback(callback.ID, fmt.Sprintf("Фільтрую за ризиком: %s", riskLevel)))
+	b.sendMessage(tgbotapi.NewCallback(callback.ID, fmt.Sprintf("Фільтрую за ризиком: %s", riskLevel)))
 
 	user, _ := b.getUserAndPrefs(callback.From.ID)
 
@@ -206,7 +206,7 @@ func (b *Bot) handleDeFiFilterByRisk(callback *tgbotapi.CallbackQuery, riskLevel
 	// Отримати DeFi opportunities за рівнем ризику
 	opportunities, err := b.defiRepo.GetByRiskLevel(riskLevel, 10)
 	if err != nil {
-		b.sendError(callback.Message.Chat.ID, "❌ Помилка отримання DeFi можливостей")
+		b.sendError(callback.Message.Chat.ID)
 		return
 	}
 
@@ -234,13 +234,13 @@ func (b *Bot) handleDeFiFilterByRisk(callback *tgbotapi.CallbackQuery, riskLevel
 	keyboard := getDeFiKeyboard()
 	edit.ReplyMarkup = &keyboard
 
-	b.api.Send(edit)
+	b.sendMessage(edit)
 }
 
 // handleDeFiFilterByTVL обробляє фільтрацію DeFi за TVL
 func (b *Bot) handleDeFiFilterByTVL(callback *tgbotapi.CallbackQuery) {
 	// Answer callback
-	b.api.Send(tgbotapi.NewCallback(callback.ID, "Фільтрую за TVL"))
+	b.sendMessage(tgbotapi.NewCallback(callback.ID, "Фільтрую за TVL"))
 
 	user, _ := b.getUserAndPrefs(callback.From.ID)
 
@@ -253,7 +253,7 @@ func (b *Bot) handleDeFiFilterByTVL(callback *tgbotapi.CallbackQuery) {
 	// Отримати топ DeFi opportunities за TVL
 	opportunities, err := b.defiRepo.GetTopByTVL(10)
 	if err != nil {
-		b.sendError(callback.Message.Chat.ID, "❌ Помилка отримання DeFi можливостей")
+		b.sendError(callback.Message.Chat.ID)
 		return
 	}
 
@@ -281,13 +281,13 @@ func (b *Bot) handleDeFiFilterByTVL(callback *tgbotapi.CallbackQuery) {
 	keyboard := getDeFiKeyboard()
 	edit.ReplyMarkup = &keyboard
 
-	b.api.Send(edit)
+	b.sendMessage(edit)
 }
 
 // handleDeFiFilterChain показує список chains для вибору
 func (b *Bot) handleDeFiFilterChain(callback *tgbotapi.CallbackQuery) {
 	// Answer callback
-	b.api.Send(tgbotapi.NewCallback(callback.ID, "Виберіть chain"))
+	b.sendMessage(tgbotapi.NewCallback(callback.ID, "Виберіть chain"))
 
 	text := "⛓️ <b>Виберіть blockchain</b>\n\n" +
 		"Оберіть chain для фільтрації DeFi можливостей:"
@@ -306,7 +306,7 @@ func (b *Bot) handleDeFiFilterChain(callback *tgbotapi.CallbackQuery) {
 			tgbotapi.NewInlineKeyboardButtonData("Avalanche", "defi_chain_avalanche"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("« Назад", "refresh_defi"),
+			tgbotapi.NewInlineKeyboardButtonData("⬅️ Назад", "refresh_defi"),
 		),
 	)
 
@@ -315,13 +315,13 @@ func (b *Bot) handleDeFiFilterChain(callback *tgbotapi.CallbackQuery) {
 	edit.ParseMode = "HTML"
 	edit.ReplyMarkup = &keyboard
 
-	b.api.Send(edit)
+	b.sendMessage(edit)
 }
 
 // handleDeFiByChain обробляє фільтрацію за конкретним chain
 func (b *Bot) handleDeFiByChain(callback *tgbotapi.CallbackQuery, chain string) {
 	// Answer callback
-	b.api.Send(tgbotapi.NewCallback(callback.ID, fmt.Sprintf("Фільтрую за chain: %s", chain)))
+	b.sendMessage(tgbotapi.NewCallback(callback.ID, fmt.Sprintf("Фільтрую за chain: %s", chain)))
 
 	user, _ := b.getUserAndPrefs(callback.From.ID)
 
@@ -334,7 +334,7 @@ func (b *Bot) handleDeFiByChain(callback *tgbotapi.CallbackQuery, chain string) 
 	// Отримати DeFi opportunities за chain
 	opportunities, err := b.defiRepo.GetByChain(chain, 10)
 	if err != nil {
-		b.sendError(callback.Message.Chat.ID, "❌ Помилка отримання DeFi можливостей")
+		b.sendError(callback.Message.Chat.ID)
 		return
 	}
 
@@ -362,13 +362,13 @@ func (b *Bot) handleDeFiByChain(callback *tgbotapi.CallbackQuery, chain string) 
 	keyboard := getDeFiKeyboard()
 	edit.ReplyMarkup = &keyboard
 
-	b.api.Send(edit)
+	b.sendMessage(edit)
 }
 
 // handleDeFiFilterProtocol показує список протоколів для вибору
 func (b *Bot) handleDeFiFilterProtocol(callback *tgbotapi.CallbackQuery) {
 	// Answer callback
-	b.api.Send(tgbotapi.NewCallback(callback.ID, "Виберіть protocol"))
+	b.sendMessage(tgbotapi.NewCallback(callback.ID, "Виберіть protocol"))
 
 	text := "🏦 <b>Виберіть DeFi protocol</b>\n\n" +
 		"Оберіть protocol для фільтрації можливостей:"
@@ -387,7 +387,7 @@ func (b *Bot) handleDeFiFilterProtocol(callback *tgbotapi.CallbackQuery) {
 			tgbotapi.NewInlineKeyboardButtonData("Balancer", "defi_protocol_balancer"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("« Назад", "refresh_defi"),
+			tgbotapi.NewInlineKeyboardButtonData("⬅️ Назад", "refresh_defi"),
 		),
 	)
 
@@ -396,13 +396,13 @@ func (b *Bot) handleDeFiFilterProtocol(callback *tgbotapi.CallbackQuery) {
 	edit.ParseMode = "HTML"
 	edit.ReplyMarkup = &keyboard
 
-	b.api.Send(edit)
+	b.sendMessage(edit)
 }
 
 // handleDeFiByProtocol обробляє фільтрацію за конкретним protocol
 func (b *Bot) handleDeFiByProtocol(callback *tgbotapi.CallbackQuery, protocol string) {
 	// Answer callback
-	b.api.Send(tgbotapi.NewCallback(callback.ID, fmt.Sprintf("Фільтрую за protocol: %s", protocol)))
+	b.sendMessage(tgbotapi.NewCallback(callback.ID, fmt.Sprintf("Фільтрую за protocol: %s", protocol)))
 
 	user, _ := b.getUserAndPrefs(callback.From.ID)
 
@@ -415,7 +415,7 @@ func (b *Bot) handleDeFiByProtocol(callback *tgbotapi.CallbackQuery, protocol st
 	// Отримати DeFi opportunities за protocol
 	opportunities, err := b.defiRepo.GetByProtocol(protocol, 10)
 	if err != nil {
-		b.sendError(callback.Message.Chat.ID, "❌ Помилка отримання DeFi можливостей")
+		b.sendError(callback.Message.Chat.ID)
 		return
 	}
 
@@ -443,5 +443,5 @@ func (b *Bot) handleDeFiByProtocol(callback *tgbotapi.CallbackQuery, protocol st
 	keyboard := getDeFiKeyboard()
 	edit.ReplyMarkup = &keyboard
 
-	b.api.Send(edit)
+	b.sendMessage(edit)
 }

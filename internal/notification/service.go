@@ -150,11 +150,6 @@ func (s *Service) CreateArbitrageNotifications(arb *models.ArbitrageOpportunity)
 			continue
 		}
 
-		// Check if user wants instant notifications
-		if !prefs.NotifyInstant {
-			continue
-		}
-
 		// Format arbitrage message
 		message := s.formatter.FormatArbitrage(arb)
 
@@ -167,12 +162,12 @@ func (s *Service) CreateArbitrageNotifications(arb *models.ArbitrageOpportunity)
 			Message:      message,
 			ScheduledFor: nil, // Instant
 			MessageData: models.JSONMap{
-				"arbitrage_id":   arb.ID,
-				"pair":           arb.Pair,
-				"exchange_buy":   arb.ExchangeBuy,
-				"exchange_sell":  arb.ExchangeSell,
-				"net_profit":     arb.NetProfitPercent,
-				"profit_usd":     arb.NetProfitUSD,
+				"arbitrage_id":  arb.ID,
+				"pair":          arb.Pair,
+				"exchange_buy":  arb.ExchangeBuy,
+				"exchange_sell": arb.ExchangeSell,
+				"net_profit":    arb.NetProfitPercent,
+				"profit_usd":    arb.NetProfitUSD,
 			},
 		}
 
@@ -215,11 +210,6 @@ func (s *Service) CreateDeFiNotifications(defi *models.DeFiOpportunity) error {
 
 		if prefs == nil {
 			log.Printf("No preferences for user %d, skipping", user.ID)
-			continue
-		}
-
-		// Check if user wants instant notifications
-		if !prefs.NotifyInstant {
 			continue
 		}
 

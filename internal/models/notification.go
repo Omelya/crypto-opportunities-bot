@@ -11,6 +11,7 @@ const (
 const (
 	NotificationPriorityLow    = "low"
 	NotificationPriorityNormal = "normal"
+	NotificationPriorityMedium = "medium"
 	NotificationPriorityHigh   = "high"
 )
 

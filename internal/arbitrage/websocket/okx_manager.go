@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -294,16 +295,16 @@ func (m *OKXManager) handleOrderBookUpdate(message []byte) {
 	symbol := denormalizeOKXSymbol(update.Arg.InstID)
 
 	// Parse timestamp
-	ts, _ := parseFloat(data.Timestamp)
+	ts := parseFloat(data.Timestamp)
 	timestamp := time.UnixMilli(int64(ts))
 
 	// Create OrderBook
 	ob := &models.OrderBook{
-		Exchange:  "okx",
-		Symbol:    symbol,
-		Timestamp: timestamp,
-		Bids:      make([]*models.PriceLevel, 0),
-		Asks:      make([]*models.PriceLevel, 0),
+		Exchange:   "okx",
+		Symbol:     symbol,
+		LastUpdate: timestamp,
+		Bids:       make([]models.PriceLevel, 0),
+		Asks:       make([]models.PriceLevel, 0),
 	}
 
 	// Parse bids
@@ -312,17 +313,10 @@ func (m *OKXManager) handleOrderBookUpdate(message []byte) {
 			continue
 		}
 
-		price, err := parseFloat(bid[0])
-		if err != nil {
-			continue
-		}
+		price := parseFloat(bid[0])
+		quantity := parseFloat(bid[1])
 
-		quantity, err := parseFloat(bid[1])
-		if err != nil {
-			continue
-		}
-
-		ob.Bids = append(ob.Bids, &models.PriceLevel{
+		ob.Bids = append(ob.Bids, models.PriceLevel{
 			Price:    price,
 			Quantity: quantity,
 		})
@@ -334,17 +328,11 @@ func (m *OKXManager) handleOrderBookUpdate(message []byte) {
 			continue
 		}
 
-		price, err := parseFloat(ask[0])
-		if err != nil {
-			continue
-		}
+		price := parseFloat(ask[0])
 
-		quantity, err := parseFloat(ask[1])
-		if err != nil {
-			continue
-		}
+		quantity := parseFloat(ask[1])
 
-		ob.Asks = append(ob.Asks, &models.PriceLevel{
+		ob.Asks = append(ob.Asks, models.PriceLevel{
 			Price:    price,
 			Quantity: quantity,
 		})
@@ -370,6 +358,7 @@ func (m *OKXManager) handleTickerUpdate(message []byte) {
 		} `json:"arg"`
 		Data []struct {
 			InstID    string `json:"instId"`
+			Open24h   string `json:"open24h"`
 			Last      string `json:"last"`
 			Vol24h    string `json:"vol24h"`
 			VolCcy24h string `json:"volCcy24h"`
@@ -391,10 +380,22 @@ func (m *OKXManager) handleTickerUpdate(message []byte) {
 
 	if m.onTicker != nil {
 		// Parse values
-		lastPrice, _ := parseFloat(data.Last)
-		volume24h, _ := parseFloat(data.VolCcy24h) // Volume in quote currency (USDT)
+		lastPrice := parseFloat(data.Last)
+		volume24h := parseFloat(data.VolCcy24h) // Volume in quote currency (USDT)
+		open24h := parseFloat(data.Open24h)
+		turnover24h := parseFloat(data.Vol24h)
+		priceChange := calculatePriceChange(lastPrice, open24h)
 
-		m.onTicker("okx", symbol, lastPrice, volume24h)
+		tickerData := &TickerData{
+			Symbol:         symbol,
+			LastPrice:      lastPrice,
+			Volume24h:      volume24h * lastPrice,
+			PriceChange:    priceChange,
+			PriceChange24h: turnover24h,
+			Timestamp:      time.Time{},
+		}
+
+		m.onTicker("okx", symbol, tickerData)
 	}
 }
 
@@ -488,4 +489,9 @@ func normalizeOKXSymbol(symbol string) string {
 // denormalizeOKXSymbol денормалізує символ з OKX (BTC-USDT -> BTC/USDT)
 func denormalizeOKXSymbol(symbol string) string {
 	return strings.ReplaceAll(symbol, "-", "/")
+}
+
+func calculatePriceChange(lastPrice float64, openPrice float64) float64 {
+	change := (lastPrice - openPrice) / openPrice * 100
+	return math.Round(change*100) / 100
 }
