@@ -1,22 +1,27 @@
 package handlers
 
 import (
+	"context"
+	"crypto-opportunities-bot/internal/command"
 	"crypto-opportunities-bot/internal/repository"
 	"net/http"
 	"runtime"
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/redis/go-redis/v9"
 )
 
 // SystemHandler обробляє системні запити
 type SystemHandler struct {
-	userRepo  repository.UserRepository
-	oppRepo   repository.OpportunityRepository
-	arbRepo   repository.ArbitrageRepository
-	defiRepo  repository.DeFiRepository
-	notifRepo repository.NotificationRepository
-	startTime time.Time
+	userRepo   repository.UserRepository
+	oppRepo    repository.OpportunityRepository
+	arbRepo    repository.ArbitrageRepository
+	defiRepo   repository.DeFiRepository
+	notifRepo  repository.NotificationRepository
+	cmdService *command.Service
+	redisClient *redis.Client
+	startTime  time.Time
 }
 
 // NewSystemHandler створює новий SystemHandler
@@ -26,14 +31,18 @@ func NewSystemHandler(
 	arbRepo repository.ArbitrageRepository,
 	defiRepo repository.DeFiRepository,
 	notifRepo repository.NotificationRepository,
+	cmdService *command.Service,
+	redisClient *redis.Client,
 ) *SystemHandler {
 	return &SystemHandler{
-		userRepo:  userRepo,
-		oppRepo:   oppRepo,
-		arbRepo:   arbRepo,
-		defiRepo:  defiRepo,
-		notifRepo: notifRepo,
-		startTime: time.Now(),
+		userRepo:    userRepo,
+		oppRepo:     oppRepo,
+		arbRepo:     arbRepo,
+		defiRepo:    defiRepo,
+		notifRepo:   notifRepo,
+		cmdService:  cmdService,
+		redisClient: redisClient,
+		startTime:   time.Now(),
 	}
 }
 
@@ -108,30 +117,64 @@ func (h *SystemHandler) TriggerScraper(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// In a real implementation, you would trigger the actual scraper here
-	// For now, we'll just return a success message
-	// TODO: Implement actual scraper triggering via channels or service calls
+	// If command service is not available, return error
+	if h.cmdService == nil {
+		respondError(w, http.StatusServiceUnavailable, "Command service not available (Redis required)")
+		return
+	}
+
+	// Send command to bot process
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	payload := map[string]interface{}{
+		"scraper": scraperName,
+	}
+
+	resp, err := h.cmdService.SendCommand(ctx, command.CommandTriggerScraper, payload)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to trigger scraper: "+err.Error())
+		return
+	}
+
+	if !resp.Success {
+		respondError(w, http.StatusInternalServerError, "Scraper triggering failed: "+resp.Error)
+		return
+	}
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
 		"message":      "Scraper triggered successfully",
 		"scraper":      scraperName,
 		"triggered_at": time.Now(),
-		"note":         "Manual scraper triggering will be implemented with scraper service integration",
+		"result":       resp.Data,
 	})
 }
 
 // TriggerAllScrapers запускає всі scrapers
 func (h *SystemHandler) TriggerAllScrapers(w http.ResponseWriter, r *http.Request) {
-	scrapers := []string{"binance", "bybit", "defi"}
+	if h.cmdService == nil {
+		respondError(w, http.StatusServiceUnavailable, "Command service not available (Redis required)")
+		return
+	}
 
-	// In a real implementation, you would trigger all scrapers here
-	// TODO: Implement actual scraper triggering
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+
+	resp, err := h.cmdService.SendCommand(ctx, command.CommandTriggerAllScrapers, nil)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to trigger scrapers: "+err.Error())
+		return
+	}
+
+	if !resp.Success {
+		respondError(w, http.StatusInternalServerError, "Scrapers triggering failed: "+resp.Error)
+		return
+	}
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
 		"message":      "All scrapers triggered successfully",
-		"scrapers":     scrapers,
 		"triggered_at": time.Now(),
-		"note":         "Manual scraper triggering will be implemented with scraper service integration",
+		"result":       resp.Data,
 	})
 }
 
@@ -180,13 +223,40 @@ func (h *SystemHandler) GetScraperStatus(w http.ResponseWriter, r *http.Request)
 
 // ClearCache очищає кеш (якщо використовується Redis)
 func (h *SystemHandler) ClearCache(w http.ResponseWriter, r *http.Request) {
-	// In a real implementation, you would clear Redis cache here
-	// TODO: Implement Redis cache clearing
+	if h.redisClient == nil {
+		respondError(w, http.StatusServiceUnavailable, "Redis not available")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	// Clear all cache keys (be careful in production!)
+	pattern := r.URL.Query().Get("pattern")
+	if pattern == "" {
+		pattern = "cache:*" // Default pattern
+	}
+
+	iter := h.redisClient.Scan(ctx, 0, pattern, 0).Iterator()
+	keysDeleted := 0
+
+	for iter.Next(ctx) {
+		if err := h.redisClient.Del(ctx, iter.Val()).Err(); err != nil {
+			continue
+		}
+		keysDeleted++
+	}
+
+	if err := iter.Err(); err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to clear cache: "+err.Error())
+		return
+	}
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"message":    "Cache cleared successfully",
-		"cleared_at": time.Now(),
-		"note":       "Redis cache clearing will be implemented when Redis is integrated",
+		"message":      "Cache cleared successfully",
+		"pattern":      pattern,
+		"keys_deleted": keysDeleted,
+		"cleared_at":   time.Now(),
 	})
 }
 
@@ -200,12 +270,28 @@ func (h *SystemHandler) GetHealthCheck(w http.ResponseWriter, r *http.Request) {
 
 // RestartNotificationDispatcher перезапускає notification dispatcher
 func (h *SystemHandler) RestartNotificationDispatcher(w http.ResponseWriter, r *http.Request) {
-	// In a real implementation, you would restart the notification dispatcher
-	// TODO: Implement notification dispatcher restart
+	if h.cmdService == nil {
+		respondError(w, http.StatusServiceUnavailable, "Command service not available (Redis required)")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	resp, err := h.cmdService.SendCommand(ctx, command.CommandRestartDispatcher, nil)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to restart dispatcher: "+err.Error())
+		return
+	}
+
+	if !resp.Success {
+		respondError(w, http.StatusInternalServerError, "Dispatcher restart failed: "+resp.Error)
+		return
+	}
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"message":      "Notification dispatcher restart triggered",
+		"message":      "Notification dispatcher restarted successfully",
 		"triggered_at": time.Now(),
-		"note":         "Dispatcher restart will be implemented with service integration",
+		"result":       resp.Data,
 	})
 }

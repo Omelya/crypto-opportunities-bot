@@ -1,22 +1,27 @@
 package handlers
 
 import (
+	"context"
+	"crypto-opportunities-bot/internal/command"
 	"crypto-opportunities-bot/internal/repository"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gorilla/mux"
 )
 
 // DeFiHandler обробляє запити пов'язані з DeFi opportunities
 type DeFiHandler struct {
-	defiRepo repository.DeFiRepository
+	defiRepo   repository.DeFiRepository
+	cmdService *command.Service
 }
 
 // NewDeFiHandler створює новий DeFiHandler
-func NewDeFiHandler(defiRepo repository.DeFiRepository) *DeFiHandler {
+func NewDeFiHandler(defiRepo repository.DeFiRepository, cmdService *command.Service) *DeFiHandler {
 	return &DeFiHandler{
-		defiRepo: defiRepo,
+		defiRepo:   defiRepo,
+		cmdService: cmdService,
 	}
 }
 
@@ -134,14 +139,30 @@ func (h *DeFiHandler) GetDeFiStats(w http.ResponseWriter, r *http.Request) {
 }
 
 // TriggerDeFiScrape запускає scraping DeFi вручну
-// TODO: This requires access to the DeFi scraper which runs in the bot
 func (h *DeFiHandler) TriggerDeFiScrape(w http.ResponseWriter, r *http.Request) {
-	// This would require access to the running DeFi scraper
-	// which is in the bot process, not the API process
+	if h.cmdService == nil {
+		respondError(w, http.StatusServiceUnavailable, "Command service not available (Redis required)")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second) // DeFi scraping може бути довшим
+	defer cancel()
+
+	resp, err := h.cmdService.SendCommand(ctx, command.CommandTriggerDeFiScrape, nil)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to trigger DeFi scrape: "+err.Error())
+		return
+	}
+
+	if !resp.Success {
+		respondError(w, http.StatusInternalServerError, "DeFi scrape failed: "+resp.Error)
+		return
+	}
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"message": "Manual DeFi scraping requires integration with bot process",
-		"note":    "This endpoint will be implemented when API and bot are integrated",
+		"message":      "DeFi scrape triggered successfully",
+		"triggered_at": time.Now(),
+		"result":       resp.Data,
 	})
 }
 

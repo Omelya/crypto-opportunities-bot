@@ -1,22 +1,27 @@
 package handlers
 
 import (
+	"context"
+	"crypto-opportunities-bot/internal/command"
 	"crypto-opportunities-bot/internal/repository"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gorilla/mux"
 )
 
 // ArbitrageHandler обробляє запити пов'язані з arbitrage
 type ArbitrageHandler struct {
-	arbRepo repository.ArbitrageRepository
+	arbRepo    repository.ArbitrageRepository
+	cmdService *command.Service
 }
 
 // NewArbitrageHandler створює новий ArbitrageHandler
-func NewArbitrageHandler(arbRepo repository.ArbitrageRepository) *ArbitrageHandler {
+func NewArbitrageHandler(arbRepo repository.ArbitrageRepository, cmdService *command.Service) *ArbitrageHandler {
 	return &ArbitrageHandler{
-		arbRepo: arbRepo,
+		arbRepo:    arbRepo,
+		cmdService: cmdService,
 	}
 }
 
@@ -133,15 +138,28 @@ func (h *ArbitrageHandler) GetArbitrageStats(w http.ResponseWriter, r *http.Requ
 }
 
 // GetExchangeStatus повертає статус підключених бірж
-// TODO: This requires access to the arbitrage detector which runs in the bot
-// For now, return placeholder data
 func (h *ArbitrageHandler) GetExchangeStatus(w http.ResponseWriter, r *http.Request) {
-	// This would require access to the running arbitrage detector
-	// which is in the bot process, not the API process
-	// For now, return basic info
+	if h.cmdService == nil {
+		respondError(w, http.StatusServiceUnavailable, "Command service not available (Redis required)")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	resp, err := h.cmdService.SendCommand(ctx, command.CommandGetExchangeStatus, nil)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to get exchange status: "+err.Error())
+		return
+	}
+
+	if !resp.Success {
+		respondError(w, http.StatusInternalServerError, "Exchange status request failed: "+resp.Error)
+		return
+	}
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"message": "Exchange status requires integration with bot process",
-		"note":    "This endpoint will be implemented when API and bot are integrated",
+		"exchanges": resp.Data,
+		"timestamp": time.Now(),
 	})
 }

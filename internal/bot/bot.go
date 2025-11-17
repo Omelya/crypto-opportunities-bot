@@ -20,6 +20,8 @@ type Bot struct {
 	subsRepo          repository.SubscriptionRepository
 	arbRepo           repository.ArbitrageRepository
 	defiRepo          repository.DeFiRepository
+	clientStatsRepo   repository.ClientStatisticsRepository
+	clientSessionRepo repository.ClientSessionRepository
 	paymentService    *payment.Service
 	config            *config.Config
 	onboardingManager *OnboardingManager
@@ -34,6 +36,8 @@ func NewBot(
 	subsRepo repository.SubscriptionRepository,
 	arbRepo repository.ArbitrageRepository,
 	defiRepo repository.DeFiRepository,
+	clientStatsRepo repository.ClientStatisticsRepository,
+	clientSessionRepo repository.ClientSessionRepository,
 	paymentService *payment.Service,
 ) (*Bot, error) {
 	api, err := tgbotapi.NewBotAPI(cfg.Telegram.BotToken)
@@ -54,6 +58,8 @@ func NewBot(
 		subsRepo:          subsRepo,
 		arbRepo:           arbRepo,
 		defiRepo:          defiRepo,
+		clientStatsRepo:   clientStatsRepo,
+		clientSessionRepo: clientSessionRepo,
 		paymentService:    paymentService,
 		config:            cfg,
 		onboardingManager: NewOnboardingManager(),

@@ -9,8 +9,73 @@ telegram:
 
 database:
   host: db
+  port: 5432
+  user: postgres
+  password: ""  # Set via DB_PASSWORD env variable
+  dbname: crypto_bot_prod
   sslmode: require
   max_conns: 50
 
 redis:
   host: redis
+  port: 6379
+  password: ""  # Set via REDIS_PASSWORD env variable
+  db: 0
+
+payment:
+  # Monobank
+  monobank_token: ""  # Set via MONOBANK_TOKEN env variable
+  monobank_public_key: ""  # Set via MONOBANK_PUBLIC_KEY env variable
+  webhook_url: "https://yourbot.com/webhook/monobank"
+  redirect_url: "https://t.me/your_bot_username"
+  webhook_port: "8081"
+
+arbitrage:
+  enabled: true
+  pairs:
+    - "BTC/USDT"
+    - "ETH/USDT"
+    - "BNB/USDT"
+    - "SOL/USDT"
+    - "XRP/USDT"
+    - "ADA/USDT"
+    - "AVAX/USDT"
+    - "DOT/USDT"
+    - "MATIC/USDT"
+    - "LINK/USDT"
+  exchanges:
+    - "binance"
+    - "bybit"
+    - "okx"
+  min_profit_percent: 0.5    # Higher threshold for production
+  min_volume_24h: 500000     # Higher volume requirement
+  max_spread_percent: 3.0
+  max_slippage: 0.3
+  amount: 1000
+  deduplicate_ttl: 5         # Longer dedup window
+
+defi:
+  enabled: true
+  chains:
+    - "Ethereum"
+    - "BSC"
+    - "Polygon"
+    - "Arbitrum"
+    - "Optimism"
+    - "Avalanche"
+  protocols: []              # Empty = all protocols
+  min_apy: 15.0              # Higher APY for production
+  min_tvl: 500000            # Higher TVL requirement
+  max_il_risk: 10.0          # Lower IL risk
+  min_volume_24h: 50000
+  scrape_interval: 60        # Every hour
+
+admin:
+  enabled: true
+  host: "0.0.0.0"
+  port: 8080
+  jwt_secret: ""             # Set via ADMIN_JWT_SECRET env variable (min 32 chars)
+  allowed_origins:
+    - "https://admin.yourbot.com"
+    - "https://yourbot.com"
+  rate_limit: 60             # Lower rate limit for production

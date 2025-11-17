@@ -166,12 +166,16 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("database.password is required")
 	}
 
-	if c.Redis.Host == "" {
-		return fmt.Errorf("redis.host is required")
-	}
+	// Redis обов'язковий лише для production
+	// Для development він опціональний (деякі функції не працюватимуть без нього)
+	if c.App.Environment == "production" {
+		if c.Redis.Host == "" {
+			return fmt.Errorf("redis.host is required for production")
+		}
 
-	if c.Redis.Port == "" {
-		return fmt.Errorf("redis.port is required")
+		if c.Redis.Port == "" {
+			return fmt.Errorf("redis.port is required for production")
+		}
 	}
 
 	if c.App.Environment == "production" {

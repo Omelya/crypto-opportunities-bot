@@ -38,16 +38,20 @@ type Client struct {
 
 	// Client metadata (e.g., user role, permissions)
 	metadata map[string]interface{}
+
+	// Event subscriptions (event_type -> subscribed)
+	subscriptions map[string]bool
 }
 
 // NewClient creates a new WebSocket client
 func NewClient(conn *websocket.Conn, hub *Hub, id string, metadata map[string]interface{}) *Client {
 	return &Client{
-		conn:     conn,
-		hub:      hub,
-		send:     make(chan *Message, 256),
-		id:       id,
-		metadata: metadata,
+		conn:          conn,
+		hub:           hub,
+		send:          make(chan *Message, 256),
+		id:            id,
+		metadata:      metadata,
+		subscriptions: make(map[string]bool),
 	}
 }
 
@@ -141,12 +145,33 @@ func (c *Client) handleIncomingMessage(data []byte) {
 
 	case "subscribe":
 		// Handle subscription to specific event types
-		// TODO: Implement selective event subscription
-		log.Printf("Client %s subscribed to: %v", c.id, msg.Data)
+		if event, ok := msg.Data["event"].(string); ok {
+			c.subscriptions[event] = true
+			c.send <- &Message{
+				Type: "subscribed",
+				Data: map[string]interface{}{
+					"event":  event,
+					"status": "success",
+				},
+				Timestamp: time.Now(),
+			}
+			log.Printf("Client %s subscribed to event: %s", c.id, event)
+		}
 
 	case "unsubscribe":
 		// Handle unsubscription
-		log.Printf("Client %s unsubscribed from: %v", c.id, msg.Data)
+		if event, ok := msg.Data["event"].(string); ok {
+			delete(c.subscriptions, event)
+			c.send <- &Message{
+				Type: "unsubscribed",
+				Data: map[string]interface{}{
+					"event":  event,
+					"status": "success",
+				},
+				Timestamp: time.Now(),
+			}
+			log.Printf("Client %s unsubscribed from event: %s", c.id, event)
+		}
 
 	default:
 		log.Printf("Unknown message type: %s", msg.Type)

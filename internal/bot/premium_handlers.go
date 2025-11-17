@@ -360,9 +360,13 @@ func (b *Bot) handleClientStats(message *tgbotapi.Message) {
 		return
 	}
 
-	// TODO: Отримати статистику через clientStatsRepo коли він буде доданий до Bot
-	// Поки що показуємо заглушку
-	text := `📊 <b>Твоя Статистика Торгівлі</b>
+	// Отримати статистику з бази даних
+	stats, err := b.clientStatsRepo.GetByUserID(user.ID)
+
+	var text string
+	if err != nil || stats == nil {
+		// Статистика ще не створена
+		text = `📊 <b>Твоя Статистика Торгівлі</b>
 
 🔄 Всього трейдів: 0
 ✅ Успішних: 0
@@ -377,6 +381,41 @@ func (b *Bot) handleClientStats(message *tgbotapi.Message) {
 <i>Статистика оновиться після першого трейду через Premium Client</i>
 
 Завантажити клієнт: /client`
+	} else {
+		// Відображаємо реальну статистику
+		winRate := 0.0
+		if stats.TotalTrades > 0 {
+			winRate = (float64(stats.SuccessfulTrades) / float64(stats.TotalTrades)) * 100
+		}
+
+		lastTrade := "Ніколи"
+		if stats.LastTradeAt != nil {
+			lastTrade = stats.LastTradeAt.Format("02.01.2006 15:04")
+		}
+
+		text = fmt.Sprintf(`📊 <b>Твоя Статистика Торгівлі</b>
+
+🔄 Всього трейдів: %d
+✅ Успішних: %d
+❌ Провалених: %d
+
+💰 Чистий прибуток: $%.2f
+📈 Win rate: %.1f%%
+🏆 Кращий трейд: $%.2f
+
+⏰ Остання торгівля: %s
+
+Продовжуй торгувати через Premium Client! 🚀
+
+/client - Завантажити клієнт`,
+			stats.TotalTrades,
+			stats.SuccessfulTrades,
+			stats.FailedTrades,
+			stats.TotalProfitLoss,
+			winRate,
+			stats.BestTrade,
+			lastTrade)
+	}
 
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ParseMode = "HTML"
