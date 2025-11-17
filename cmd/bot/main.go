@@ -5,6 +5,7 @@ import (
 	"crypto-opportunities-bot/internal/arbitrage"
 	"crypto-opportunities-bot/internal/arbitrage/websocket"
 	"crypto-opportunities-bot/internal/bot"
+	"crypto-opportunities-bot/internal/cleanup"
 	"crypto-opportunities-bot/internal/config"
 	"crypto-opportunities-bot/internal/models"
 	"crypto-opportunities-bot/internal/notification"
@@ -192,6 +193,19 @@ func main() {
 	}
 	log.Printf("✅ Daily digest scheduler started")
 	defer digestScheduler.Stop()
+
+	// Cleanup Scheduler (daily at 2:00 AM)
+	cleanupScheduler := cleanup.NewScheduler(oppRepo, arbRepo, defiRepo, notifRepo, nil)
+	if err := cleanupScheduler.Start(); err != nil {
+		log.Fatalf("Failed to start cleanup scheduler: %v", err)
+	}
+	defer cleanupScheduler.Stop()
+
+	// Run initial cleanup if in development mode
+	if cfg.App.Environment == "development" {
+		log.Println("Running initial cleanup...")
+		cleanupScheduler.RunNow()
+	}
 
 	// Arbitrage System (Premium feature)
 	var arbitrageDetector *arbitrage.Detector
