@@ -45,3 +45,8 @@ func (s *Scheduler) Stop() {
 func (s *Scheduler) RunNow() error {
 	return s.service.RunAll()
 }
+
+// RunScraper запускає конкретний scraper по імені
+func (s *Scheduler) RunScraper(name string) error {
+	return s.service.RunScraper(name)
+}

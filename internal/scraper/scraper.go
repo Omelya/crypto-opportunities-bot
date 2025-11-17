@@ -97,6 +97,42 @@ func (s *Service) RunAll() error {
 	return nil
 }
 
+// RunScraper запускає конкретний scraper по імені
+func (s *Service) RunScraper(name string) error {
+	for _, scraper := range s.scrapers {
+		if scraper.GetExchange() == name {
+			log.Printf("Scraping %s...", scraper.GetExchange())
+
+			opportunities, err := scraper.ScrapeAll()
+			if err != nil {
+				return fmt.Errorf("error scraping %s: %w", scraper.GetExchange(), err)
+			}
+
+			log.Printf("Found %d opportunities on %s", len(opportunities), scraper.GetExchange())
+
+			totalNew := 0
+			for _, opp := range opportunities {
+				existing, _ := s.oppRepo.GetByExternalID(opp.ExternalID)
+
+				if existing == nil {
+					if err := s.oppRepo.Create(opp); err != nil {
+						log.Printf("Error creating opportunity: %v", err)
+						continue
+					}
+					totalNew++
+					log.Printf("✅ New opportunity: %s - %s", opp.Exchange, opp.Title)
+					s.notifyNewOpportunity(opp)
+				}
+			}
+
+			log.Printf("Scraping %s completed: %d new opportunities", name, totalNew)
+			return nil
+		}
+	}
+
+	return fmt.Errorf("scraper not found: %s", name)
+}
+
 func (s *Service) notifyNewOpportunity(opp *models.Opportunity) {
 	for _, callback := range s.newOpportunityCallbacks {
 		go callback(opp)

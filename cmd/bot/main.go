@@ -6,6 +6,7 @@ import (
 	"crypto-opportunities-bot/internal/arbitrage/websocket"
 	"crypto-opportunities-bot/internal/bot"
 	"crypto-opportunities-bot/internal/cleanup"
+	"crypto-opportunities-bot/internal/command"
 	"crypto-opportunities-bot/internal/config"
 	"crypto-opportunities-bot/internal/models"
 	"crypto-opportunities-bot/internal/notification"
@@ -60,6 +61,8 @@ func main() {
 	paymentRepo := repository.NewPaymentRepository(db)
 	arbRepo := repository.NewArbitrageRepository(db)
 	defiRepo := repository.NewDeFiRepository(db)
+	clientStatsRepo := repository.NewClientStatisticsRepository(db)
+	clientSessionRepo := repository.NewClientSessionRepository(db)
 
 	botAPI, err := tgbotapi.NewBotAPI(cfg.Telegram.BotToken)
 	if err != nil {
@@ -228,11 +231,47 @@ func main() {
 		defer premiumWatcher.Stop()
 	}
 
-	telegramBot, err := bot.NewBot(cfg, userRepo, prefsRepo, oppRepo, actionRepo, subsRepo, arbRepo, defiRepo, paymentService)
+	telegramBot, err := bot.NewBot(
+		cfg,
+		userRepo,
+		prefsRepo,
+		oppRepo,
+		actionRepo,
+		subsRepo,
+		arbRepo,
+		defiRepo,
+		clientStatsRepo,
+		clientSessionRepo,
+		paymentService,
+	)
 	if err != nil {
 		log.Fatalf("Failed to create bot: %v", err)
 	}
 	log.Printf("✅ Telegram bot initialized")
+
+	// Initialize Redis and Command Service for IPC with Admin API
+	redisClient, err := command.NewRedisClient(cfg.Redis)
+	if err != nil && cfg.App.Environment == "production" {
+		log.Fatalf("❌ Failed to connect to Redis (required in production): %v", err)
+	}
+	if redisClient != nil {
+		defer command.CloseRedisClient(redisClient)
+		log.Println("✅ Redis connected")
+
+		// Command Service для прийому команд від API
+		cmdService := command.NewService(redisClient)
+		if err := cmdService.Start(); err != nil {
+			log.Printf("⚠️  Failed to start command service: %v", err)
+		} else {
+			log.Println("✅ Command service started (listening for API commands)")
+
+			// Command Processor для обробки команд
+			commandProcessor := bot.NewCommandProcessor(cmdService, scraperScheduler, notificationService)
+			commandProcessor.Start()
+		}
+	} else {
+		log.Println("⚠️  Redis not available - IPC features disabled (manual scraper triggering from API won't work)")
+	}
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)

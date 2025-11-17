@@ -7,6 +7,7 @@ import (
 	"crypto-opportunities-bot/internal/repository"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,17 +18,20 @@ var premiumUpgrader = websocket.Upgrader{
 	ReadBufferSize:  2048,
 	WriteBufferSize: 2048,
 	CheckOrigin: func(r *http.Request) bool {
-		// TODO: In production, check against allowed origins
+		// Origin checking is done manually in ServePremiumClient
+		// to allow per-handler configuration
 		return true
 	},
 }
 
 // ClientHandler handles Premium Client WebSocket connections
 type ClientHandler struct {
-	clientHub   *ClientHub
-	jwtManager  *auth.JWTManager
-	sessionRepo repository.ClientSessionRepository
-	userRepo    repository.UserRepository
+	clientHub      *ClientHub
+	jwtManager     *auth.JWTManager
+	sessionRepo    repository.ClientSessionRepository
+	userRepo       repository.UserRepository
+	allowedOrigins []string
+	environment    string
 }
 
 // NewClientHandler creates a new ClientHandler
@@ -36,17 +40,58 @@ func NewClientHandler(
 	jwtManager *auth.JWTManager,
 	sessionRepo repository.ClientSessionRepository,
 	userRepo repository.UserRepository,
+	allowedOrigins []string,
+	environment string,
 ) *ClientHandler {
 	return &ClientHandler{
-		clientHub:   clientHub,
-		jwtManager:  jwtManager,
-		sessionRepo: sessionRepo,
-		userRepo:    userRepo,
+		clientHub:      clientHub,
+		jwtManager:     jwtManager,
+		sessionRepo:    sessionRepo,
+		userRepo:       userRepo,
+		allowedOrigins: allowedOrigins,
+		environment:    environment,
 	}
+}
+
+// checkOrigin validates the Origin header against allowed origins
+func (h *ClientHandler) checkOrigin(r *http.Request) bool {
+	// In development, allow all origins
+	if h.environment != "production" {
+		return true
+	}
+
+	// If no origins configured, allow all (but log warning)
+	if len(h.allowedOrigins) == 0 {
+		log.Printf("⚠️ No allowed origins configured in production - allowing all")
+		return true
+	}
+
+	// Get origin from request
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		// No origin header (e.g., non-browser clients) - allow
+		return true
+	}
+
+	// Check if origin is in allowed list
+	for _, allowed := range h.allowedOrigins {
+		if strings.EqualFold(origin, allowed) {
+			return true
+		}
+	}
+
+	log.Printf("❌ Rejected WebSocket connection from unauthorized origin: %s", origin)
+	return false
 }
 
 // ServePremiumClient handles Premium Client WebSocket upgrade requests
 func (h *ClientHandler) ServePremiumClient(w http.ResponseWriter, r *http.Request) {
+	// Check origin in production
+	if !h.checkOrigin(r) {
+		http.Error(w, "Origin not allowed", http.StatusForbidden)
+		return
+	}
+
 	// Extract user claims from context (set by JWT middleware)
 	claims := middleware.GetUserFromContext(r.Context())
 	if claims == nil {

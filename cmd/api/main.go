@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto-opportunities-bot/internal/api"
+	"crypto-opportunities-bot/internal/command"
 	"crypto-opportunities-bot/internal/config"
 	"crypto-opportunities-bot/internal/repository"
 	"log"
@@ -48,6 +49,29 @@ func main() {
 	adminRepo := repository.NewAdminRepository(db)
 	actionRepo := repository.NewUserActionRepository(db)
 
+	// Initialize Redis (optional for development, required for production)
+	redisClient, err := command.NewRedisClient(cfg.Redis)
+	if err != nil && cfg.App.Environment == "production" {
+		log.Fatalf("❌ Failed to connect to Redis (required in production): %v", err)
+	}
+	if redisClient != nil {
+		defer command.CloseRedisClient(redisClient)
+		log.Println("✅ Redis connected")
+	} else {
+		log.Println("⚠️  Redis not available - IPC features will be disabled")
+	}
+
+	// Initialize Command Service (for IPC with Bot process)
+	var cmdService *command.Service
+	if redisClient != nil {
+		cmdService = command.NewService(redisClient)
+		if err := cmdService.Start(); err != nil {
+			log.Printf("⚠️  Failed to start command service: %v", err)
+		} else {
+			log.Println("✅ Command service started (IPC enabled)")
+		}
+	}
+
 	// Create default admin if environment variables are set
 	if username := os.Getenv("ADMIN_DEFAULT_USERNAME"); username != "" {
 		password := os.Getenv("ADMIN_DEFAULT_PASSWORD")
@@ -72,6 +96,8 @@ func main() {
 		notifRepo,
 		adminRepo,
 		actionRepo,
+		cmdService,
+		redisClient,
 	)
 
 	// Start server in goroutine

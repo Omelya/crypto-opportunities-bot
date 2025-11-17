@@ -6,6 +6,7 @@ import (
 	"crypto-opportunities-bot/internal/api/handlers"
 	"crypto-opportunities-bot/internal/api/middleware"
 	"crypto-opportunities-bot/internal/api/websocket"
+	"crypto-opportunities-bot/internal/command"
 	"crypto-opportunities-bot/internal/config"
 	"crypto-opportunities-bot/internal/models"
 	"crypto-opportunities-bot/internal/repository"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/redis/go-redis/v9"
 )
 
 // Server представляє HTTP сервер для Admin API
@@ -32,26 +34,30 @@ type Server struct {
 	adminRepo  repository.AdminRepository
 	actionRepo repository.UserActionRepository
 
+	// IPC
+	cmdService  *command.Service
+	redisClient *redis.Client
+
 	// Auth & Middleware
 	jwtManager  *auth.JWTManager
 	rateLimiter *middleware.RateLimiter
 
 	// Handlers
-	healthHandler     *handlers.HealthHandler
-	authHandler       *handlers.AuthHandler
-	userHandler       *handlers.UserHandler
-	statsHandler      *handlers.StatsHandler
-	oppHandler        *handlers.OpportunityHandler
-	arbHandler        *handlers.ArbitrageHandler
-	defiHandler       *handlers.DeFiHandler
-	notifHandler      *handlers.NotificationHandler
-	systemHandler     *handlers.SystemHandler
-	broadcastHandler  *handlers.BroadcastHandler
+	healthHandler    *handlers.HealthHandler
+	authHandler      *handlers.AuthHandler
+	userHandler      *handlers.UserHandler
+	statsHandler     *handlers.StatsHandler
+	oppHandler       *handlers.OpportunityHandler
+	arbHandler       *handlers.ArbitrageHandler
+	defiHandler      *handlers.DeFiHandler
+	notifHandler     *handlers.NotificationHandler
+	systemHandler    *handlers.SystemHandler
+	broadcastHandler *handlers.BroadcastHandler
 
 	// WebSocket
-	wsHub            *websocket.Hub
-	wsHandler        *websocket.Handler
-	monitorService   *websocket.MonitorService
+	wsHub          *websocket.Hub
+	wsHandler      *websocket.Handler
+	monitorService *websocket.MonitorService
 }
 
 // NewServer створює новий Admin API server
@@ -64,16 +70,20 @@ func NewServer(
 	notifRepo repository.NotificationRepository,
 	adminRepo repository.AdminRepository,
 	actionRepo repository.UserActionRepository,
+	cmdService *command.Service,
+	redisClient *redis.Client,
 ) *Server {
 	s := &Server{
-		config:     cfg,
-		userRepo:   userRepo,
-		oppRepo:    oppRepo,
-		arbRepo:    arbRepo,
-		defiRepo:   defiRepo,
-		notifRepo:  notifRepo,
-		adminRepo:  adminRepo,
-		actionRepo: actionRepo,
+		config:      cfg,
+		userRepo:    userRepo,
+		oppRepo:     oppRepo,
+		arbRepo:     arbRepo,
+		defiRepo:    defiRepo,
+		notifRepo:   notifRepo,
+		adminRepo:   adminRepo,
+		actionRepo:  actionRepo,
+		cmdService:  cmdService,
+		redisClient: redisClient,
 	}
 
 	// Initialize JWT Manager
@@ -88,10 +98,10 @@ func NewServer(
 	s.userHandler = handlers.NewUserHandler(userRepo, actionRepo, notifRepo)
 	s.statsHandler = handlers.NewStatsHandler(userRepo, oppRepo, arbRepo, defiRepo, notifRepo)
 	s.oppHandler = handlers.NewOpportunityHandler(oppRepo)
-	s.arbHandler = handlers.NewArbitrageHandler(arbRepo)
-	s.defiHandler = handlers.NewDeFiHandler(defiRepo)
+	s.arbHandler = handlers.NewArbitrageHandler(arbRepo, cmdService)
+	s.defiHandler = handlers.NewDeFiHandler(defiRepo, cmdService)
 	s.notifHandler = handlers.NewNotificationHandler(notifRepo, userRepo, oppRepo)
-	s.systemHandler = handlers.NewSystemHandler(userRepo, oppRepo, arbRepo, defiRepo, notifRepo)
+	s.systemHandler = handlers.NewSystemHandler(userRepo, oppRepo, arbRepo, defiRepo, notifRepo, cmdService, redisClient)
 	s.broadcastHandler = handlers.NewBroadcastHandler(userRepo)
 
 	// Initialize WebSocket
