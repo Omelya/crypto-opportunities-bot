@@ -12,6 +12,7 @@ const (
 	CommandSubscription = "subscription"
 	CommandSupport      = "support"
 	CommandArbitrage    = "arbitrage"
+	CommandDeFi         = "defi"
 )
 
 // Callback data для inline buttons

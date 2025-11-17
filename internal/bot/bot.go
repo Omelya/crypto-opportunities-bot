@@ -18,6 +18,7 @@ type Bot struct {
 	actionRepo        repository.UserActionRepository
 	subsRepo          repository.SubscriptionRepository
 	arbRepo           repository.ArbitrageRepository
+	defiRepo          repository.DeFiRepository
 	paymentService    *payment.Service
 	config            *config.Config
 	onboardingManager *OnboardingManager
@@ -31,6 +32,7 @@ func NewBot(
 	actionRepo repository.UserActionRepository,
 	subsRepo repository.SubscriptionRepository,
 	arbRepo repository.ArbitrageRepository,
+	defiRepo repository.DeFiRepository,
 	paymentService *payment.Service,
 ) (*Bot, error) {
 	api, err := tgbotapi.NewBotAPI(cfg.Telegram.BotToken)
@@ -50,6 +52,7 @@ func NewBot(
 		actionRepo:        actionRepo,
 		subsRepo:          subsRepo,
 		arbRepo:           arbRepo,
+		defiRepo:          defiRepo,
 		paymentService:    paymentService,
 		config:            cfg,
 		onboardingManager: NewOnboardingManager(),
@@ -105,6 +108,8 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 		b.handleSubscription(message)
 	case CommandArbitrage:
 		b.handleArbitrage(message)
+	case CommandDeFi:
+		b.handleDeFi(message)
 	case CommandSupport:
 		b.handleSupport(message)
 	default:
@@ -135,6 +140,56 @@ func (b *Bot) handleCallback(callback *tgbotapi.CallbackQuery) {
 
 	if data == "refresh_arbitrage" {
 		b.handleArbitrageRefresh(callback)
+		return
+	}
+
+	// DeFi callbacks
+	if data == "refresh_defi" {
+		b.handleDeFiRefresh(callback)
+		return
+	}
+
+	if data == "defi_filter_apy" {
+		b.handleDeFiRefresh(callback) // Same as refresh - top by APY
+		return
+	}
+
+	if data == "defi_filter_tvl" {
+		b.handleDeFiFilterByTVL(callback)
+		return
+	}
+
+	if data == "defi_filter_low" {
+		b.handleDeFiFilterByRisk(callback, "low")
+		return
+	}
+
+	if data == "defi_filter_med" {
+		b.handleDeFiFilterByRisk(callback, "medium")
+		return
+	}
+
+	if data == "defi_filter_chain" {
+		b.handleDeFiFilterChain(callback)
+		return
+	}
+
+	if data == "defi_filter_protocol" {
+		b.handleDeFiFilterProtocol(callback)
+		return
+	}
+
+	// DeFi chain filters
+	if strings.HasPrefix(data, "defi_chain_") {
+		chain := strings.TrimPrefix(data, "defi_chain_")
+		b.handleDeFiByChain(callback, chain)
+		return
+	}
+
+	// DeFi protocol filters
+	if strings.HasPrefix(data, "defi_protocol_") {
+		protocol := strings.TrimPrefix(data, "defi_protocol_")
+		b.handleDeFiByProtocol(callback, protocol)
 		return
 	}
 
