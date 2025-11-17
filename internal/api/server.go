@@ -2,9 +2,11 @@ package api
 
 import (
 	"context"
+	"crypto-opportunities-bot/internal/api/auth"
 	"crypto-opportunities-bot/internal/api/handlers"
 	"crypto-opportunities-bot/internal/api/middleware"
 	"crypto-opportunities-bot/internal/config"
+	"crypto-opportunities-bot/internal/models"
 	"crypto-opportunities-bot/internal/repository"
 	"fmt"
 	"log"
@@ -28,8 +30,13 @@ type Server struct {
 	notifRepo  repository.NotificationRepository
 	adminRepo  repository.AdminRepository
 
+	// Auth & Middleware
+	jwtManager  *auth.JWTManager
+	rateLimiter *middleware.RateLimiter
+
 	// Handlers
 	healthHandler *handlers.HealthHandler
+	authHandler   *handlers.AuthHandler
 	userHandler   *handlers.UserHandler
 	statsHandler  *handlers.StatsHandler
 }
@@ -54,8 +61,15 @@ func NewServer(
 		adminRepo: adminRepo,
 	}
 
+	// Initialize JWT Manager
+	s.jwtManager = auth.NewJWTManager(cfg.Admin.JWTSecret, 24*time.Hour)
+
+	// Initialize Rate Limiter
+	s.rateLimiter = middleware.NewRateLimiter(cfg.Admin.RateLimit)
+
 	// Initialize handlers
 	s.healthHandler = handlers.NewHealthHandler()
+	s.authHandler = handlers.NewAuthHandler(adminRepo, s.jwtManager)
 	s.userHandler = handlers.NewUserHandler(userRepo)
 	s.statsHandler = handlers.NewStatsHandler(userRepo, oppRepo, arbRepo, defiRepo, notifRepo)
 
@@ -73,26 +87,43 @@ func (s *Server) setupRouter() {
 	r.Use(middleware.LoggingMiddleware)
 	r.Use(middleware.RecoveryMiddleware)
 	r.Use(middleware.CORSMiddleware(s.config.Admin.AllowedOrigins))
+	r.Use(s.rateLimiter.RateLimitMiddleware) // Rate limiting
 
 	// API v1 routes
 	api := r.PathPrefix("/api/v1").Subrouter()
 
-	// Public routes (no auth required)
+	// ========== Public routes (no auth required) ==========
+
+	// Health check
 	api.HandleFunc("/health", s.healthHandler.Health).Methods("GET")
 	api.HandleFunc("/ping", s.healthHandler.Ping).Methods("GET")
 
-	// TODO: Protected routes (require JWT)
-	// api.Use(middleware.JWTAuthMiddleware)
+	// Authentication
+	api.HandleFunc("/auth/login", s.authHandler.Login).Methods("POST")
+	api.HandleFunc("/auth/refresh", s.authHandler.RefreshToken).Methods("POST")
 
-	// User management
-	api.HandleFunc("/users", s.userHandler.ListUsers).Methods("GET")
-	api.HandleFunc("/users/{id}", s.userHandler.GetUser).Methods("GET")
-	api.HandleFunc("/users/{id}", s.userHandler.UpdateUser).Methods("PUT")
-	api.HandleFunc("/users/{id}/stats", s.userHandler.GetUserStats).Methods("GET")
+	// ========== Protected routes (require JWT) ==========
 
-	// Statistics
-	api.HandleFunc("/stats/dashboard", s.statsHandler.Dashboard).Methods("GET")
-	api.HandleFunc("/stats/users", s.statsHandler.UserStats).Methods("GET")
+	protected := api.PathPrefix("").Subrouter()
+	protected.Use(middleware.JWTAuthMiddleware(s.jwtManager))
+
+	// Auth endpoints (require auth)
+	protected.HandleFunc("/auth/logout", s.authHandler.Logout).Methods("POST")
+	protected.HandleFunc("/auth/me", s.authHandler.Me).Methods("GET")
+
+	// User management (viewer+)
+	protected.HandleFunc("/users", s.userHandler.ListUsers).Methods("GET")
+	protected.HandleFunc("/users/{id}", s.userHandler.GetUser).Methods("GET")
+	protected.HandleFunc("/users/{id}/stats", s.userHandler.GetUserStats).Methods("GET")
+
+	// User modifications (admin+)
+	adminRoutes := protected.PathPrefix("").Subrouter()
+	adminRoutes.Use(middleware.RequireRole(models.AdminRoleAdmin))
+	adminRoutes.HandleFunc("/users/{id}", s.userHandler.UpdateUser).Methods("PUT")
+
+	// Statistics (viewer+)
+	protected.HandleFunc("/stats/dashboard", s.statsHandler.Dashboard).Methods("GET")
+	protected.HandleFunc("/stats/users", s.statsHandler.UserStats).Methods("GET")
 
 	s.router = r
 }

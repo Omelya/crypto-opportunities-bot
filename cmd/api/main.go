@@ -33,11 +33,11 @@ func main() {
 	}
 	log.Println("✅ Database connected")
 
-	// Auto-migrate (if needed)
-	// Note: Migrations are handled by the bot, but we can add admin-specific tables here
-	// if err := repository.AutoMigrate(db); err != nil {
-	// 	log.Fatalf("Failed to migrate database: %v", err)
-	// }
+	// Auto-migrate admin tables
+	if err := repository.MigrateAdminTables(db); err != nil {
+		log.Fatalf("Failed to migrate admin tables: %v", err)
+	}
+	log.Println("✅ Admin tables migrated")
 
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(db)
@@ -45,9 +45,21 @@ func main() {
 	arbRepo := repository.NewArbitrageRepository(db)
 	defiRepo := repository.NewDeFiRepository(db)
 	notifRepo := repository.NewNotificationRepository(db)
+	adminRepo := repository.NewAdminRepository(db)
 
-	// TODO: Initialize adminRepo when AdminRepository is created
-	// adminRepo := repository.NewAdminRepository(db)
+	// Create default admin if environment variables are set
+	if username := os.Getenv("ADMIN_DEFAULT_USERNAME"); username != "" {
+		password := os.Getenv("ADMIN_DEFAULT_PASSWORD")
+		email := os.Getenv("ADMIN_DEFAULT_EMAIL")
+
+		if password != "" && email != "" {
+			if err := repository.CreateDefaultAdmin(db, username, password, email); err != nil {
+				log.Printf("⚠️ Could not create default admin: %v", err)
+			} else {
+				log.Printf("✅ Default admin created: %s", username)
+			}
+		}
+	}
 
 	// Create API server
 	server := api.NewServer(
@@ -57,7 +69,7 @@ func main() {
 		arbRepo,
 		defiRepo,
 		notifRepo,
-		nil, // adminRepo - будемо додати пізніше
+		adminRepo,
 	)
 
 	// Start server in goroutine
