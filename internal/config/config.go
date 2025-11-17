@@ -17,6 +17,7 @@ type Config struct {
 	Redis     RedisConfig     `yaml:"redis" mapstructure:"redis"`
 	Payment   PaymentConfig   `yaml:"payment" mapstructure:"payment"`
 	Arbitrage ArbitrageConfig `yaml:"arbitrage" mapstructure:"arbitrage"`
+	DeFi      DeFiConfig      `yaml:"defi" mapstructure:"defi"`
 }
 
 type AppConfig struct {
@@ -71,6 +72,17 @@ type ArbitrageConfig struct {
 	MaxSpreadPercent  float64  `yaml:"max_spread_percent" mapstructure:"max_spread_percent"`
 	MaxSlippage       float64  `yaml:"max_slippage" mapstructure:"max_slippage"`
 	DeduplicateTTL    int      `yaml:"deduplicate_ttl" mapstructure:"deduplicate_ttl"` // minutes
+}
+
+type DeFiConfig struct {
+	Enabled         bool     `yaml:"enabled" mapstructure:"enabled"`
+	Chains          []string `yaml:"chains" mapstructure:"chains"`
+	Protocols       []string `yaml:"protocols" mapstructure:"protocols"`
+	MinAPY          float64  `yaml:"min_apy" mapstructure:"min_apy"`
+	MinTVL          float64  `yaml:"min_tvl" mapstructure:"min_tvl"`
+	MaxILRisk       float64  `yaml:"max_il_risk" mapstructure:"max_il_risk"`
+	MinVolume24h    float64  `yaml:"min_volume_24h" mapstructure:"min_volume_24h"`
+	ScrapeInterval  int      `yaml:"scrape_interval" mapstructure:"scrape_interval"` // minutes
 }
 
 func LoadConfig(configPath string) (*Config, error) {
@@ -213,6 +225,16 @@ func (c *Config) SafeString() string {
 			Max Spread: %.2f%%
 			Max Slippage: %.2f%%
 			Deduplicate TTL: %d min
+
+		DeFi:
+			Enabled: %t
+			Chains: %v
+			Protocols: %v
+			Min APY: %.2f%%
+			Min TVL: $%.0f
+			Max IL Risk: %.2f%%
+			Min Volume: $%.0f
+			Scrape Interval: %d min
 		`,
 		c.App.Environment,
 		c.App.Port,
@@ -241,6 +263,14 @@ func (c *Config) SafeString() string {
 		c.Arbitrage.MaxSpreadPercent,
 		c.Arbitrage.MaxSlippage,
 		c.Arbitrage.DeduplicateTTL,
+		c.DeFi.Enabled,
+		c.DeFi.Chains,
+		c.DeFi.Protocols,
+		c.DeFi.MinAPY,
+		c.DeFi.MinTVL,
+		c.DeFi.MaxILRisk,
+		c.DeFi.MinVolume24h,
+		c.DeFi.ScrapeInterval,
 	)
 }
 

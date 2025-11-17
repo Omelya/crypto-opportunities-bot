@@ -57,3 +57,19 @@ arbitrage:
   max_spread_percent: 5.0    # Maximum 5% spread to consider
   max_slippage: 0.5          # Maximum 0.5% slippage
   deduplicate_ttl: 3         # Deduplicate window in minutes
+
+defi:
+  enabled: true
+  chains:                    # Top chains by TVL
+    - "Ethereum"
+    - "BSC"
+    - "Polygon"
+    - "Arbitrum"
+    - "Optimism"
+    - "Avalanche"
+  protocols: []              # Empty = all protocols (filter by APY/TVL instead)
+  min_apy: 10.0              # Minimum 10% APY
+  min_tvl: 100000            # Minimum $100K TVL for safety
+  max_il_risk: 15.0          # Maximum 15% impermanent loss risk
+  min_volume_24h: 10000      # Minimum $10K daily volume
+  scrape_interval: 30        # Scrape every 30 minutes

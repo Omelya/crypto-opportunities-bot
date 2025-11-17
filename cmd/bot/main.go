@@ -58,6 +58,7 @@ func main() {
 	subsRepo := repository.NewSubscriptionRepository(db)
 	paymentRepo := repository.NewPaymentRepository(db)
 	arbRepo := repository.NewArbitrageRepository(db)
+	defiRepo := repository.NewDeFiRepository(db)
 
 	botAPI, err := tgbotapi.NewBotAPI(cfg.Telegram.BotToken)
 	if err != nil {
@@ -73,6 +74,7 @@ func main() {
 		prefsRepo,
 		oppRepo,
 		arbRepo,
+		defiRepo,
 	)
 	log.Printf("✅ Notification service initialized")
 
@@ -121,6 +123,40 @@ func main() {
 		}
 	})
 
+	// DeFi Scraper (Premium feature)
+	if cfg.DeFi.Enabled {
+		defiScraperConfig := scraper.DeFiScraperConfig{
+			Chains:       cfg.DeFi.Chains,
+			Protocols:    cfg.DeFi.Protocols,
+			MinAPY:       cfg.DeFi.MinAPY,
+			MinTVL:       cfg.DeFi.MinTVL,
+			MaxIL:        cfg.DeFi.MaxILRisk,
+			MinVolume24h: cfg.DeFi.MinVolume24h,
+		}
+
+		defiScraper := scraper.NewDeFiScraper(defiRepo, defiScraperConfig)
+
+		// Wire DeFi callbacks to notification system
+		defiScraper.OnNewDeFi(func(defi *models.DeFiOpportunity) {
+			log.Printf("🌾 New DeFi opportunity: %s on %s (APY: %.2f%%)", defi.PoolName, defi.Chain, defi.APY)
+
+			// Create notifications for premium users
+			if err := notificationService.CreateDeFiNotifications(defi); err != nil {
+				log.Printf("❌ Failed to create DeFi notifications: %v", err)
+			}
+		})
+
+		log.Printf("✅ DeFi scraper initialized")
+		log.Printf("   Chains: %v", cfg.DeFi.Chains)
+		log.Printf("   Min APY: %.2f%%", cfg.DeFi.MinAPY)
+		log.Printf("   Min TVL: $%.0f", cfg.DeFi.MinTVL)
+		log.Printf("   Max IL Risk: %.2f%%", cfg.DeFi.MaxILRisk)
+
+		// TODO: Add DeFi scraper scheduler (separate from regular scrapers due to longer interval)
+	} else {
+		log.Printf("⚠️ DeFi monitoring disabled in config")
+	}
+
 	scraperScheduler := scraper.NewScheduler(scraperService)
 	if err := scraperScheduler.Start(); err != nil {
 		log.Fatalf("Failed to start scraper scheduler: %v", err)
@@ -166,7 +202,7 @@ func main() {
 		defer premiumWatcher.Stop()
 	}
 
-	telegramBot, err := bot.NewBot(cfg, userRepo, prefsRepo, oppRepo, actionRepo, subsRepo, arbRepo, paymentService)
+	telegramBot, err := bot.NewBot(cfg, userRepo, prefsRepo, oppRepo, actionRepo, subsRepo, arbRepo, defiRepo, paymentService)
 	if err != nil {
 		log.Fatalf("Failed to create bot: %v", err)
 	}

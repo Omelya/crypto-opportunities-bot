@@ -17,6 +17,7 @@ type Service struct {
 	prefsRepo repository.UserPreferencesRepository
 	oppRepo   repository.OpportunityRepository
 	arbRepo   repository.ArbitrageRepository
+	defiRepo  repository.DeFiRepository
 	formatter *Formatter
 	filter    *Filter
 }
@@ -28,6 +29,7 @@ func NewService(
 	prefsRepo repository.UserPreferencesRepository,
 	oppRepo repository.OpportunityRepository,
 	arbRepo repository.ArbitrageRepository,
+	defiRepo repository.DeFiRepository,
 ) *Service {
 	return &Service{
 		bot:       bot,
@@ -36,6 +38,7 @@ func NewService(
 		prefsRepo: prefsRepo,
 		oppRepo:   oppRepo,
 		arbRepo:   arbRepo,
+		defiRepo:  defiRepo,
 		formatter: NewFormatter(),
 		filter:    NewFilter(),
 	}
@@ -183,6 +186,109 @@ func (s *Service) CreateArbitrageNotifications(arb *models.ArbitrageOpportunity)
 
 	log.Printf("Created %d arbitrage notifications for: %s", created, arb.Pair)
 	return nil
+}
+
+// CreateDeFiNotifications створює notification для DeFi opportunity (Premium only)
+func (s *Service) CreateDeFiNotifications(defi *models.DeFiOpportunity) error {
+	log.Printf("📢 Creating DeFi notifications for: %s on %s (APY: %.2f%%)",
+		defi.PoolName, defi.Chain, defi.APY)
+
+	// Get all premium users
+	users, err := s.userRepo.List(0, 10000)
+	if err != nil {
+		return fmt.Errorf("failed to get users: %w", err)
+	}
+
+	created := 0
+
+	for _, user := range users {
+		// Only Premium users get DeFi notifications
+		if !user.IsPremium() {
+			continue
+		}
+
+		prefs, err := s.prefsRepo.GetByUserID(user.ID)
+		if err != nil {
+			log.Printf("Failed to get preferences for user %d: %v", user.ID, err)
+			continue
+		}
+
+		if prefs == nil {
+			log.Printf("No preferences for user %d, skipping", user.ID)
+			continue
+		}
+
+		// Check if user wants instant notifications
+		if !prefs.NotifyInstant {
+			continue
+		}
+
+		// TODO: Add DeFi-specific filters when user preferences are extended
+		// For now, filter by minimum APY threshold (use MinROI as proxy)
+		if defi.APY < prefs.MinROI {
+			continue
+		}
+
+		// Filter by risk profile
+		if !s.matchesRiskProfile(user.RiskProfile, defi.RiskLevel) {
+			continue
+		}
+
+		// Format DeFi message
+		message := s.formatter.FormatDeFi(defi)
+
+		// Determine priority based on APY
+		priority := models.NotificationPriorityNormal
+		if defi.APY >= 50 {
+			priority = models.NotificationPriorityHigh
+		} else if defi.APY >= 30 {
+			priority = models.NotificationPriorityMedium
+		}
+
+		// Premium users get instant notifications (no delay)
+		notification := &models.Notification{
+			UserID:       user.ID,
+			Type:         "defi",
+			Priority:     priority,
+			Status:       models.NotificationStatusPending,
+			Message:      message,
+			ScheduledFor: nil, // Instant
+			MessageData: models.JSONMap{
+				"defi_id":    defi.ID,
+				"protocol":   defi.Protocol,
+				"chain":      defi.Chain,
+				"pool_name":  defi.PoolName,
+				"apy":        defi.APY,
+				"tvl":        defi.TVL,
+				"risk_level": defi.RiskLevel,
+				"pool_url":   defi.PoolURL,
+			},
+		}
+
+		if err := s.notifRepo.Create(notification); err != nil {
+			log.Printf("Failed to create DeFi notification for user %d: %v", user.ID, err)
+			continue
+		}
+
+		created++
+	}
+
+	log.Printf("✅ Created %d DeFi notifications for: %s", created, defi.PoolName)
+	return nil
+}
+
+// matchesRiskProfile перевіряє чи відповідає рівень ризику профілю користувача
+func (s *Service) matchesRiskProfile(userProfile string, opportunityRisk string) bool {
+	switch userProfile {
+	case "conservative":
+		return opportunityRisk == "low"
+	case "moderate":
+		return opportunityRisk == "low" || opportunityRisk == "medium"
+	case "aggressive":
+		return true // All risk levels acceptable
+	default:
+		return opportunityRisk == "low" || opportunityRisk == "medium"
+	}
 }
 
 func (s *Service) SendPendingNotifications(batchSize int) error {

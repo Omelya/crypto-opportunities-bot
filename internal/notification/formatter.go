@@ -200,6 +200,80 @@ func (f *Formatter) FormatArbitrageAlert(exchangeBuy, exchangeSell, pair string,
 	return builder.String()
 }
 
+// FormatDeFi форматує DeFi opportunity
+func (f *Formatter) FormatDeFi(defi *models.DeFiOpportunity) string {
+	var builder strings.Builder
+
+	// Emoji based on APY
+	emoji := "🌾"
+	if defi.APY >= 50 {
+		emoji = "🔥🌾"
+	} else if defi.APY >= 30 {
+		emoji = "⭐🌾"
+	}
+
+	builder.WriteString(fmt.Sprintf("%s <b>DeFi Opportunity</b>\n\n", emoji))
+
+	// Protocol and Chain
+	builder.WriteString(fmt.Sprintf("🏦 Protocol: <b>%s</b>\n", strings.Title(defi.Protocol)))
+	builder.WriteString(fmt.Sprintf("⛓️ Chain: <b>%s</b>\n", strings.Title(defi.Chain)))
+	builder.WriteString(fmt.Sprintf("💧 Pool: <b>%s</b>\n\n", defi.GetDisplayName()))
+
+	// Profitability
+	builder.WriteString(fmt.Sprintf("📈 APY: <b>%.2f%%</b>\n", defi.APY))
+	if defi.APYBase > 0 && defi.APYReward > 0 {
+		builder.WriteString(fmt.Sprintf("   ├ Base: %.2f%%\n", defi.APYBase))
+		builder.WriteString(fmt.Sprintf("   └ Rewards: %.2f%%\n", defi.APYReward))
+	}
+	builder.WriteString(fmt.Sprintf("💰 Daily return: <b>%.3f%%</b>\n", defi.DailyReturn))
+	builder.WriteString(fmt.Sprintf("💵 На $1000: <b>$%.2f/день</b> (<b>$%.2f/місяць</b>)\n\n",
+		defi.DailyReturnUSD(1000), defi.MonthlyReturnUSD(1000)))
+
+	// Liquidity and Volume
+	builder.WriteString(fmt.Sprintf("📊 TVL: <b>$%.2fM</b>\n", defi.TVL/1_000_000))
+	if defi.Volume24h > 0 {
+		builder.WriteString(fmt.Sprintf("📈 Volume 24h: <b>$%.2fK</b>\n", defi.Volume24h/1000))
+	}
+	builder.WriteString("\n")
+
+	// Risk Assessment
+	riskEmoji := f.getRiskEmoji(defi.RiskLevel)
+	builder.WriteString(fmt.Sprintf("%s Risk: <b>%s</b>\n", riskEmoji, f.getRiskName(defi.RiskLevel)))
+
+	if defi.ILRisk > 0 {
+		ilEmoji := "✅"
+		if defi.ILRisk > 10 {
+			ilEmoji = "⚠️"
+		} else if defi.ILRisk > 5 {
+			ilEmoji = "⚡"
+		}
+		builder.WriteString(fmt.Sprintf("%s IL Risk: <b>%.1f%%</b>\n", ilEmoji, defi.ILRisk))
+	}
+
+	if defi.IsAudited() {
+		builder.WriteString("✅ Audited: <b>Yes</b>\n")
+	}
+	builder.WriteString("\n")
+
+	// Requirements
+	builder.WriteString(fmt.Sprintf("💼 Min Deposit: <b>$%.0f</b>\n", defi.MinDeposit))
+
+	if defi.HasLockPeriod() {
+		builder.WriteString(fmt.Sprintf("🔒 Lock Period: <b>%d days</b>\n", defi.LockPeriod))
+	} else {
+		builder.WriteString("🔓 No lock period\n")
+	}
+
+	// Rewards
+	if len(defi.RewardTokens) > 0 {
+		builder.WriteString(fmt.Sprintf("🎁 Rewards: <b>%s</b>\n", strings.Join(defi.RewardTokens, ", ")))
+	}
+
+	builder.WriteString("\n⚠️ <i>DeFi involves risks. DYOR before investing.</i>")
+
+	return builder.String()
+}
+
 // Helper методи
 
 func (f *Formatter) getOpportunityEmoji(oppType string) string {
@@ -322,5 +396,31 @@ func (f *Formatter) getCapitalRange(capitalRange string) (float64, float64) {
 		return 5000, 10000
 	default:
 		return 500, 1000
+	}
+}
+
+func (f *Formatter) getRiskEmoji(riskLevel string) string {
+	switch riskLevel {
+	case "low":
+		return "✅"
+	case "medium":
+		return "⚡"
+	case "high":
+		return "⚠️"
+	default:
+		return "❓"
+	}
+}
+
+func (f *Formatter) getRiskName(riskLevel string) string {
+	switch riskLevel {
+	case "low":
+		return "Низький"
+	case "medium":
+		return "Середній"
+	case "high":
+		return "Високий"
+	default:
+		return "Невідомий"
 	}
 }
