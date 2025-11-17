@@ -5,6 +5,7 @@ import (
 	"crypto-opportunities-bot/internal/arbitrage"
 	"crypto-opportunities-bot/internal/arbitrage/websocket"
 	"crypto-opportunities-bot/internal/bot"
+	"crypto-opportunities-bot/internal/cleanup"
 	"crypto-opportunities-bot/internal/config"
 	"crypto-opportunities-bot/internal/models"
 	"crypto-opportunities-bot/internal/notification"
@@ -152,7 +153,19 @@ func main() {
 		log.Printf("   Min TVL: $%.0f", cfg.DeFi.MinTVL)
 		log.Printf("   Max IL Risk: %.2f%%", cfg.DeFi.MaxILRisk)
 
-		// TODO: Add DeFi scraper scheduler (separate from regular scrapers due to longer interval)
+		// Start DeFi monitoring scheduler
+		defiTicker := startDeFiMonitoring(defiScraper, cfg.DeFi.ScrapeInterval)
+		defer defiTicker.Stop()
+
+		// Initial scraping if in development mode
+		if cfg.App.Environment == "development" {
+			log.Println("Running initial DeFi scraping...")
+			go func() {
+				if _, err := defiScraper.ScrapeAll(); err != nil {
+					log.Printf("⚠️ Initial DeFi scraping failed: %v", err)
+				}
+			}()
+		}
 	} else {
 		log.Printf("⚠️ DeFi monitoring disabled in config")
 	}
@@ -180,6 +193,19 @@ func main() {
 	}
 	log.Printf("✅ Daily digest scheduler started")
 	defer digestScheduler.Stop()
+
+	// Cleanup Scheduler (daily at 2:00 AM)
+	cleanupScheduler := cleanup.NewScheduler(oppRepo, arbRepo, defiRepo, notifRepo, nil)
+	if err := cleanupScheduler.Start(); err != nil {
+		log.Fatalf("Failed to start cleanup scheduler: %v", err)
+	}
+	defer cleanupScheduler.Stop()
+
+	// Run initial cleanup if in development mode
+	if cfg.App.Environment == "development" {
+		log.Println("Running initial cleanup...")
+		cleanupScheduler.RunNow()
+	}
 
 	// Arbitrage System (Premium feature)
 	var arbitrageDetector *arbitrage.Detector
@@ -327,6 +353,16 @@ func startArbitrageMonitoring(
 		log.Printf("✅ Connected to %s WebSocket (%d pairs)", exchange, len(cfg.Arbitrage.Pairs))
 	}
 
+	// Validate that at least one exchange connected successfully
+	connectedExchanges := obManager.GetExchanges()
+	if len(connectedExchanges) == 0 {
+		log.Printf("❌ Failed to connect to any exchanges - arbitrage monitoring cannot start")
+		log.Printf("   Check exchange WebSocket endpoints and network connectivity")
+		return nil
+	}
+
+	log.Printf("📊 Successfully connected to %d exchanges: %v", len(connectedExchanges), connectedExchanges)
+
 	// Create Calculator
 	calculator := arbitrage.NewCalculator()
 
@@ -405,5 +441,22 @@ func startPremiumWatcher(
 	}()
 
 	log.Println("👀 Premium watcher started (every 5 min)")
+	return ticker
+}
+
+func startDeFiMonitoring(defiScraper *scraper.DeFiScraper, intervalMinutes int) *time.Ticker {
+	interval := time.Duration(intervalMinutes) * time.Minute
+	ticker := time.NewTicker(interval)
+
+	go func() {
+		for range ticker.C {
+			log.Printf("🌾 Running DeFi scraping (interval: %d min)...", intervalMinutes)
+			if _, err := defiScraper.ScrapeAll(); err != nil {
+				log.Printf("❌ DeFi scraping error: %v", err)
+			}
+		}
+	}()
+
+	log.Printf("✅ DeFi monitoring started (every %d min)", intervalMinutes)
 	return ticker
 }

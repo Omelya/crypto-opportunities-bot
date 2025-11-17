@@ -218,3 +218,90 @@ func (f *Filter) addMinutes(timeStr string, minutes int) string {
 	t = t.Add(time.Duration(minutes) * time.Minute)
 	return t.Format("15:04")
 }
+
+// ShouldNotifyArbitrage перевіряє чи потрібно відправити арбітражне сповіщення
+func (f *Filter) ShouldNotifyArbitrage(user *models.User, prefs *models.UserPreferences, arb *models.ArbitrageOpportunity) bool {
+	// User must be active and not blocked
+	if !user.IsActive || user.IsBlocked {
+		return false
+	}
+
+	// Must be Premium
+	if !user.IsPremium() {
+		return false
+	}
+
+	// Check if arbitrage notifications are enabled
+	if !prefs.NotifyArbitrage {
+		return false
+	}
+
+	// Check if both exchanges are enabled
+	if !f.areBothExchangesEnabled(arb.ExchangeBuy, arb.ExchangeSell, prefs) {
+		return false
+	}
+
+	// Check min ROI
+	if arb.NetProfitPercent < prefs.MinROI {
+		return false
+	}
+
+	// Check max investment (recommended amount should be within user's budget)
+	if prefs.MaxInvestment > 0 && arb.RecommendedAmount > float64(prefs.MaxInvestment) {
+		return false
+	}
+
+	return true
+}
+
+// areBothExchangesEnabled перевіряє чи обидві біржі увімкнені в preferences
+func (f *Filter) areBothExchangesEnabled(exchangeBuy, exchangeSell string, prefs *models.UserPreferences) bool {
+	// If no exchanges specified - allow all
+	if len(prefs.Exchanges) == 0 {
+		return true
+	}
+
+	buyEnabled := false
+	sellEnabled := false
+
+	for _, enabledExchange := range prefs.Exchanges {
+		if enabledExchange == exchangeBuy {
+			buyEnabled = true
+		}
+		if enabledExchange == exchangeSell {
+			sellEnabled = true
+		}
+	}
+
+	return buyEnabled && sellEnabled
+}
+
+// ShouldNotifyDeFi перевіряє чи потрібно відправити DeFi сповіщення
+func (f *Filter) ShouldNotifyDeFi(user *models.User, prefs *models.UserPreferences, defi *models.DeFiOpportunity) bool {
+	// User must be active and not blocked
+	if !user.IsActive || user.IsBlocked {
+		return false
+	}
+
+	// Must be Premium
+	if !user.IsPremium() {
+		return false
+	}
+
+	// Check if DeFi notifications are enabled
+	if !prefs.NotifyDeFi {
+		return false
+	}
+
+	// Check min ROI (APY in this case)
+	if defi.APY < prefs.MinROI {
+		return false
+	}
+
+	// Check min deposit vs max investment
+	if prefs.MaxInvestment > 0 && defi.MinDeposit > float64(prefs.MaxInvestment) {
+		return false
+	}
+
+	return true
+}

@@ -6,7 +6,17 @@ import (
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
+
+// titleCaser is used to replace deprecated strings.Title()
+var titleCaser = cases.Title(language.English)
+
+// titleCase замінює deprecated strings.Title()
+func titleCase(s string) string {
+	return titleCaser.String(s)
+}
 
 // handleDeFi обробляє команду /defi (тільки для Premium)
 func (b *Bot) handleDeFi(message *tgbotapi.Message) {
@@ -89,11 +99,11 @@ func formatDeFiOpportunity(opp *models.DeFiOpportunity, index int) string {
 			"├ %s Risk: <b>%s</b> | IL: %.1f%%\n"+
 			"└ 💼 Min Deposit: <b>$%.0f</b>\n",
 		emoji, index, opp.GetDisplayName(),
-		strings.Title(opp.Protocol), strings.Title(opp.Chain),
+		titleCase(opp.Protocol), titleCase(opp.Chain),
 		opp.APY, opp.APYBase, opp.APYReward,
 		opp.DailyReturnUSD(1000), opp.MonthlyReturnUSD(1000),
 		opp.TVL/1_000_000,
-		riskEmoji, strings.Title(opp.RiskLevel), opp.ILRisk,
+		riskEmoji, titleCase(opp.RiskLevel), opp.ILRisk,
 		opp.MinDeposit,
 	)
 }
@@ -215,9 +225,9 @@ func (b *Bot) handleDeFiFilterByRisk(callback *tgbotapi.CallbackQuery, riskLevel
 	if len(opportunities) == 0 {
 		text = fmt.Sprintf("🌾 <b>DeFi Opportunities - %s risk</b>\n\n"+
 			"Немає активних можливостей з таким рівнем ризику.\n\n"+
-			"Спробуйте інший фільтр або оновіть список.", strings.Title(riskLevel))
+			"Спробуйте інший фільтр або оновіть список.", titleCase(riskLevel))
 	} else {
-		text = fmt.Sprintf("🌾 <b>DeFi Opportunities - %s risk</b>\n\n", strings.Title(riskLevel))
+		text = fmt.Sprintf("🌾 <b>DeFi Opportunities - %s risk</b>\n\n", titleCase(riskLevel))
 
 		for i, opp := range opportunities {
 			text += formatDeFiOpportunity(opp, i+1)
@@ -343,9 +353,9 @@ func (b *Bot) handleDeFiByChain(callback *tgbotapi.CallbackQuery, chain string) 
 	if len(opportunities) == 0 {
 		text = fmt.Sprintf("🌾 <b>DeFi Opportunities - %s</b>\n\n"+
 			"Немає активних можливостей на цьому chain.\n\n"+
-			"Спробуйте інший chain або оновіть список.", strings.Title(chain))
+			"Спробуйте інший chain або оновіть список.", titleCase(chain))
 	} else {
-		text = fmt.Sprintf("🌾 <b>DeFi Opportunities - %s</b>\n\n", strings.Title(chain))
+		text = fmt.Sprintf("🌾 <b>DeFi Opportunities - %s</b>\n\n", titleCase(chain))
 
 		for i, opp := range opportunities {
 			text += formatDeFiOpportunity(opp, i+1)
@@ -424,9 +434,9 @@ func (b *Bot) handleDeFiByProtocol(callback *tgbotapi.CallbackQuery, protocol st
 	if len(opportunities) == 0 {
 		text = fmt.Sprintf("🌾 <b>DeFi Opportunities - %s</b>\n\n"+
 			"Немає активних можливостей у цьому протоколі.\n\n"+
-			"Спробуйте інший protocol або оновіть список.", strings.Title(protocol))
+			"Спробуйте інший protocol або оновіть список.", titleCase(protocol))
 	} else {
-		text = fmt.Sprintf("🌾 <b>DeFi Opportunities - %s</b>\n\n", strings.Title(protocol))
+		text = fmt.Sprintf("🌾 <b>DeFi Opportunities - %s</b>\n\n", titleCase(protocol))
 
 		for i, opp := range opportunities {
 			text += formatDeFiOpportunity(opp, i+1)

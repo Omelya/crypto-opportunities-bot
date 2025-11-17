@@ -19,6 +19,7 @@ func NewScheduler(service *Service) *Scheduler {
 }
 
 func (s *Scheduler) Start() error {
+	// Scraping every 5 minutes
 	_, err := s.cron.AddFunc("*/5 * * * *", func() {
 		log.Println("Starting scheduled scraping...")
 		if err := s.service.RunAll(); err != nil {
@@ -30,20 +31,8 @@ func (s *Scheduler) Start() error {
 		return err
 	}
 
-	_, err = s.cron.AddFunc("0 2 * * *", func() {
-		log.Println("Cleaning up old opportunities...")
-
-		if err := s.service.oppRepo.DeleteOld(30); err != nil {
-			log.Printf("Cleanup error: %v", err)
-		}
-	})
-
-	if err != nil {
-		return err
-	}
-
 	s.cron.Start()
-	log.Println("✅ Scraper scheduler started")
+	log.Println("✅ Scraper scheduler started (every 5 minutes)")
 
 	return nil
 }

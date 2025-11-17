@@ -150,6 +150,11 @@ func (s *Service) CreateArbitrageNotifications(arb *models.ArbitrageOpportunity)
 			continue
 		}
 
+		// Filter by user preferences
+		if !s.filter.ShouldNotifyArbitrage(user, prefs, arb) {
+			continue
+		}
+
 		// Format arbitrage message
 		message := s.formatter.FormatArbitrage(arb)
 
@@ -213,9 +218,8 @@ func (s *Service) CreateDeFiNotifications(defi *models.DeFiOpportunity) error {
 			continue
 		}
 
-		// TODO: Add DeFi-specific filters when user preferences are extended
-		// For now, filter by minimum APY threshold (use MinROI as proxy)
-		if defi.APY < prefs.MinROI {
+		// Filter by user preferences
+		if !s.filter.ShouldNotifyDeFi(user, prefs, defi) {
 			continue
 		}
 

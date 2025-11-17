@@ -254,3 +254,20 @@ func (m *OrderBookManager) GetLiquidity(symbol string, side string, maxLevels in
 
 	return liquidity
 }
+
+// DisconnectAll закриває всі WebSocket з'єднання
+func (m *OrderBookManager) DisconnectAll() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for exchange, manager := range m.wsManagers {
+		log.Printf("🔌 Disconnecting from %s...", exchange)
+		if err := manager.Disconnect(); err != nil {
+			log.Printf("⚠️ Error disconnecting from %s: %v", exchange, err)
+		}
+	}
+
+	// Clear all data
+	m.wsManagers = make(map[string]websocket.Manager)
+	m.orderbooks = make(map[string]map[string]*models.OrderBook)
+}

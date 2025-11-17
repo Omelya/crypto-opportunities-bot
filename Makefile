@@ -2,7 +2,9 @@
 
 # Variables
 BINARY_NAME=crypto-bot
+ADMIN_BINARY=crypto-admin-api
 MAIN_PATH=cmd/bot/main.go
+ADMIN_PATH=cmd/api/main.go
 GO=go
 GOFLAGS=-v
 
@@ -128,6 +130,23 @@ logs: ## Show application logs (when running in background)
 stats: ## Show bot statistics
 	@echo "Bot statistics:"
 	@echo "TODO: Implement stats gathering"
+
+# Admin API
+admin-build: ## Build Admin API
+	@echo "Building Admin API..."
+	$(GO) build $(GOFLAGS) -o $(ADMIN_BINARY) $(ADMIN_PATH)
+	@echo "✅ Admin API build complete: ./$(ADMIN_BINARY)"
+
+admin-run: ## Run Admin API
+	@echo "Starting Admin API..."
+	$(GO) run $(ADMIN_PATH)
+
+admin-dev: docker-up admin-run ## Start docker and run Admin API in dev mode
+
+admin-test: ## Test Admin API endpoints
+	@echo "Testing Admin API..."
+	@curl -s http://localhost:8080/api/v1/health | jq || echo "Admin API not running"
+	@curl -s http://localhost:8080/api/v1/ping | jq
 
 # All-in-one commands
 restart: docker-down docker-up run ## Restart everything
