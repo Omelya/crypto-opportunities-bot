@@ -902,6 +902,180 @@ POST /api/v1/broadcast/:id/cancel
 }
 ```
 
+### WebSocket Real-time Monitoring
+
+WebSocket endpoint для моніторингу системи в реальному часі.
+
+**Connection:**
+```
+ws://localhost:8080/api/v1/ws/monitor
+```
+
+**Authentication:**
+- Requires JWT token (same as REST API)
+- Send token in connection query: `ws://localhost:8080/api/v1/ws/monitor?token=<JWT_TOKEN>`
+- Or use WebSocket subprotocol for auth
+
+**Message Format:**
+```json
+{
+  "type": "message_type",
+  "data": { ... },
+  "timestamp": "2024-01-20T15:30:00Z",
+  "metadata": { ... }
+}
+```
+
+**Event Types:**
+
+1. **System Metrics** (`system.metrics`)
+   - Broadcast every 5 seconds
+   - Contains: uptime, goroutines, memory, DB counts, notifications
+   ```json
+   {
+     "type": "system.metrics",
+     "data": {
+       "uptime": "2h15m30s",
+       "system": {
+         "goroutines": 25,
+         "memory_alloc_mb": 45,
+         "memory_sys_mb": 78,
+         "gc_runs": 15
+       },
+       "database": {
+         "users": 1500,
+         "opportunities": 25,
+         "arbitrage": 8,
+         "defi": 15
+       },
+       "notifications": {
+         "pending": 120,
+         "sent": 15000,
+         "failed": 45
+       },
+       "websocket": {
+         "connected_clients": 3
+       }
+     },
+     "timestamp": "2024-01-20T15:30:00Z"
+   }
+   ```
+
+2. **Notification Events**
+   - `notification.created` - New notification created
+   - `notification.sent` - Notification sent successfully
+   - `notification.failed` - Notification failed
+
+3. **Scraper Events**
+   - `scraper.started` - Scraper started
+   - `scraper.completed` - Scraper finished successfully
+   - `scraper.failed` - Scraper failed
+
+4. **Opportunity Events**
+   - `opportunity.created` - New opportunity detected
+   - `opportunity.updated` - Opportunity updated
+   - `opportunity.expired` - Opportunity expired
+
+5. **User Events**
+   - `user.registered` - New user registered
+   - `user.subscribed` - User upgraded to premium
+
+**Client Messages:**
+
+Ping-Pong:
+```json
+// Send
+{ "type": "ping" }
+
+// Receive
+{ "type": "pong", "data": { "status": "ok" } }
+```
+
+Subscribe to specific events (future):
+```json
+{
+  "type": "subscribe",
+  "data": {
+    "events": ["notification.*", "scraper.completed"]
+  }
+}
+```
+
+**JavaScript Example:**
+```javascript
+const token = 'your-jwt-token';
+const ws = new WebSocket(`ws://localhost:8080/api/v1/ws/monitor`);
+
+// Send auth after connection (if not in query)
+ws.onopen = () => {
+  console.log('Connected to WebSocket');
+};
+
+ws.onmessage = (event) => {
+  const message = JSON.parse(event.data);
+  console.log('Event:', message.type, message.data);
+
+  if (message.type === 'system.metrics') {
+    updateDashboard(message.data);
+  } else if (message.type === 'notification.sent') {
+    showNotification(message.data);
+  } else if (message.type === 'scraper.completed') {
+    updateScraperStatus(message.data);
+  }
+};
+
+ws.onerror = (error) => {
+  console.error('WebSocket error:', error);
+};
+
+ws.onclose = () => {
+  console.log('WebSocket closed');
+  // Implement reconnection logic
+};
+
+// Send ping every 30 seconds
+setInterval(() => {
+  ws.send(JSON.stringify({ type: 'ping' }));
+}, 30000);
+```
+
+**Go Example:**
+```go
+import (
+  "github.com/gorilla/websocket"
+)
+
+// Connect to WebSocket
+conn, _, err := websocket.DefaultDialer.Dial(
+  "ws://localhost:8080/api/v1/ws/monitor",
+  http.Header{"Authorization": []string{"Bearer " + token}},
+)
+if err != nil {
+  log.Fatal(err)
+}
+defer conn.Close()
+
+// Read messages
+for {
+  var msg map[string]interface{}
+  err := conn.ReadJSON(&msg)
+  if err != nil {
+    break
+  }
+
+  fmt.Printf("Event: %s\n", msg["type"])
+}
+```
+
+**Features:**
+- Real-time system metrics (every 5 seconds)
+- Live notification tracking
+- Scraper progress monitoring
+- Opportunity alerts
+- User activity tracking
+- Automatic reconnection support
+- Ping/pong keep-alive
+
 ### Authentication
 
 ```bash
@@ -1037,8 +1211,11 @@ internal/api/
 ├── auth/                         # Authentication
 │   ├── jwt.go                    # JWT manager
 │   └── token.go                  # Token helpers
-└── websocket/                    # WebSocket (Future)
-    └── monitor.go                # Real-time monitoring
+└── websocket/                    # WebSocket real-time monitoring
+    ├── hub.go                    # WebSocket connection hub
+    ├── client.go                 # WebSocket client
+    ├── handler.go                # WebSocket HTTP handler
+    └── monitor.go                # Monitoring service & event broadcasting
 ```
 
 ## 🧪 Testing
@@ -1047,10 +1224,22 @@ internal/api/
 # Run tests
 go test ./internal/api/... -v
 
-# Test with curl
+# Test REST API with curl
 curl http://localhost:8080/api/v1/health
 curl http://localhost:8080/api/v1/ping
-curl http://localhost:8080/api/v1/users
+
+# Test with authentication
+TOKEN="your-jwt-token"
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/v1/users
+
+# Test WebSocket with wscat (install: npm i -g wscat)
+wscat -c ws://localhost:8080/api/v1/ws/monitor -H "Authorization: Bearer $TOKEN"
+
+# Test WebSocket with websocat
+websocat ws://localhost:8080/api/v1/ws/monitor
+
+# Test WebSocket programmatically
+go run examples/websocket_client.go
 ```
 
 ## 📝 TODO
@@ -1079,8 +1268,8 @@ curl http://localhost:8080/api/v1/users
 - [x] Notification management endpoints (list, get, retry, delete, stats)
 - [x] System control endpoints (status, health, scrapers, cache, dispatcher)
 - [x] Broadcast system (send, history, stats, cancel)
+- [x] WebSocket real-time monitoring (system metrics, events broadcasting)
 - [ ] Payment management (Stripe integration) - Postponed
-- [ ] WebSocket real-time monitoring - Postponed
 
 ### Phase 4 - Future
 - [ ] Swagger/OpenAPI documentation

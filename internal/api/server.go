@@ -5,6 +5,7 @@ import (
 	"crypto-opportunities-bot/internal/api/auth"
 	"crypto-opportunities-bot/internal/api/handlers"
 	"crypto-opportunities-bot/internal/api/middleware"
+	"crypto-opportunities-bot/internal/api/websocket"
 	"crypto-opportunities-bot/internal/config"
 	"crypto-opportunities-bot/internal/models"
 	"crypto-opportunities-bot/internal/repository"
@@ -46,6 +47,11 @@ type Server struct {
 	notifHandler      *handlers.NotificationHandler
 	systemHandler     *handlers.SystemHandler
 	broadcastHandler  *handlers.BroadcastHandler
+
+	// WebSocket
+	wsHub            *websocket.Hub
+	wsHandler        *websocket.Handler
+	monitorService   *websocket.MonitorService
 }
 
 // NewServer створює новий Admin API server
@@ -87,6 +93,18 @@ func NewServer(
 	s.notifHandler = handlers.NewNotificationHandler(notifRepo, userRepo, oppRepo)
 	s.systemHandler = handlers.NewSystemHandler(userRepo, oppRepo, arbRepo, defiRepo, notifRepo)
 	s.broadcastHandler = handlers.NewBroadcastHandler(userRepo)
+
+	// Initialize WebSocket
+	s.wsHub = websocket.NewHub()
+	s.wsHandler = websocket.NewHandler(s.wsHub, s.jwtManager)
+	s.monitorService = websocket.NewMonitorService(
+		s.wsHub,
+		userRepo,
+		oppRepo,
+		arbRepo,
+		defiRepo,
+		notifRepo,
+	)
 
 	// Setup router
 	s.setupRouter()
@@ -188,6 +206,9 @@ func (s *Server) setupRouter() {
 	protected.HandleFunc("/broadcast/stats", s.broadcastHandler.GetBroadcastStats).Methods("GET")
 	adminRoutes.HandleFunc("/broadcast/{id}/cancel", s.broadcastHandler.CancelBroadcast).Methods("POST")
 
+	// WebSocket real-time monitoring (viewer+)
+	protected.HandleFunc("/ws/monitor", s.wsHandler.ServeMonitor)
+
 	s.router = r
 }
 
@@ -203,8 +224,17 @@ func (s *Server) Start() error {
 		IdleTimeout:  60 * time.Second,
 	}
 
+	// Start WebSocket hub
+	go s.wsHub.Run()
+	log.Println("✅ WebSocket hub started")
+
+	// Start monitoring service (broadcast metrics every 5 seconds)
+	s.monitorService.Start(5 * time.Second)
+	log.Println("✅ Monitoring service started")
+
 	log.Printf("🚀 Admin API server starting on %s", addr)
 	log.Printf("📝 Swagger UI: http://%s/swagger", addr)
+	log.Printf("🔌 WebSocket: ws://%s/api/v1/ws/monitor", addr)
 
 	if err := s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("failed to start server: %w", err)
@@ -217,6 +247,10 @@ func (s *Server) Start() error {
 func (s *Server) Stop(ctx context.Context) error {
 	log.Println("🛑 Shutting down Admin API server...")
 
+	// Stop monitoring service
+	s.monitorService.Stop()
+	log.Println("✅ Monitoring service stopped")
+
 	if err := s.httpServer.Shutdown(ctx); err != nil {
 		return fmt.Errorf("server shutdown failed: %w", err)
 	}
@@ -228,4 +262,14 @@ func (s *Server) Stop(ctx context.Context) error {
 // Router повертає router для тестування
 func (s *Server) Router() *mux.Router {
 	return s.router
+}
+
+// GetMonitorService повертає WebSocket monitor service
+func (s *Server) GetMonitorService() *websocket.MonitorService {
+	return s.monitorService
+}
+
+// GetWebSocketHub повертає WebSocket hub
+func (s *Server) GetWebSocketHub() *websocket.Hub {
+	return s.wsHub
 }
