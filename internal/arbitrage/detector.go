@@ -13,21 +13,15 @@ type Detector struct {
 	obManager    *OrderBookManager
 	calculator   *Calculator
 	arbRepo      repository.ArbitrageRepository
-	userRepo     repository.UserRepository
-	config       *Config
 	deduplicator *Deduplicator
 
-	onOpportunity OpportunityCallback
-}
+	// Configuration
+	minProfitPercent float64
+	minVolume24h     float64
+	maxSpreadPercent float64
+	maxSlippage      float64
 
-// Config конфігурація детектора
-type Config struct {
-	MinProfitPercent float64       // Мінімальний profit (%)
-	MinVolume24h     float64       // Мінімальний 24h volume
-	MaxSpreadPercent float64       // Максимальний spread
-	TestAmountUSD    float64       // Сума для тестування slippage
-	MaxSlippage      float64       // Максимальний допустимий slippage (%)
-	TTL              time.Duration // Час життя можливості
+	onOpportunity OpportunityCallback
 }
 
 // OpportunityCallback викликається при знаходженні можливості
@@ -37,17 +31,22 @@ type OpportunityCallback func(*models.ArbitrageOpportunity)
 func NewDetector(
 	obManager *OrderBookManager,
 	calc *Calculator,
+	deduplicator *Deduplicator,
 	arbRepo repository.ArbitrageRepository,
-	userRepo repository.UserRepository,
-	config *Config,
+	minProfitPercent float64,
+	minVolume24h float64,
+	maxSpreadPercent float64,
+	maxSlippage float64,
 ) *Detector {
 	return &Detector{
-		obManager:    obManager,
-		calculator:   calc,
-		arbRepo:      arbRepo,
-		userRepo:     userRepo,
-		config:       config,
-		deduplicator: NewDeduplicator(3 * time.Minute),
+		obManager:        obManager,
+		calculator:       calc,
+		deduplicator:     deduplicator,
+		arbRepo:          arbRepo,
+		minProfitPercent: minProfitPercent,
+		minVolume24h:     minVolume24h,
+		maxSpreadPercent: maxSpreadPercent,
+		maxSlippage:      maxSlippage,
 	}
 }
 
@@ -133,7 +132,7 @@ func (d *Detector) calculateWithSlippage(
 	sellOB *models.OrderBook,
 ) *models.ArbitrageOpportunity {
 
-	testAmount := d.config.TestAmountUSD
+	testAmount := 1000.0 // Default test amount in USD
 
 	// Розрахувати slippage для купівлі
 	buySlippage := buyOB.CalculateSlippage("buy", testAmount)
@@ -148,8 +147,8 @@ func (d *Detector) calculateWithSlippage(
 	}
 
 	// Перевірити slippage limits
-	if buySlippage.SlippagePercent > d.config.MaxSlippage ||
-		sellSlippage.SlippagePercent > d.config.MaxSlippage {
+	if buySlippage.SlippagePercent > d.maxSlippage ||
+		sellSlippage.SlippagePercent > d.maxSlippage {
 		return nil // Занадто великий slippage
 	}
 
@@ -177,12 +176,13 @@ func (d *Detector) calculateWithSlippage(
 	}
 
 	// Перевірити чи ще прибутково після slippage
-	if calc.NetProfit < d.config.MinProfitPercent {
+	if calc.NetProfit < d.minProfitPercent {
 		return nil
 	}
 
 	// Створити ArbitrageOpportunity
 	now := time.Now()
+	ttl := 5 * time.Minute // Default TTL for arbitrage opportunities
 
 	return &models.ArbitrageOpportunity{
 		Pair:             symbol,
@@ -211,7 +211,7 @@ func (d *Detector) calculateWithSlippage(
 		MaxTradeAmount:   min(buySlippage.AvailableLiquidityUSD, sellSlippage.AvailableLiquidityUSD),
 		RecommendedAmount: calc.RecommendedAmount,
 		DetectedAt:       now,
-		ExpiresAt:        now.Add(d.config.TTL),
+		ExpiresAt:        now.Add(ttl),
 		IsNotified:       false,
 		ExternalID:       GenerateArbitrageID(symbol, buyExchange, sellExchange, now),
 	}
@@ -220,18 +220,18 @@ func (d *Detector) calculateWithSlippage(
 // shouldCreate фільтрує можливості перед створенням
 func (d *Detector) shouldCreate(opp *models.ArbitrageOpportunity) bool {
 	// Min profit
-	if opp.NetProfitPercent < d.config.MinProfitPercent {
+	if opp.NetProfitPercent < d.minProfitPercent {
 		return false
 	}
 
 	// Min volume
-	if d.config.MinVolume24h > 0 && opp.Volume24h < d.config.MinVolume24h {
+	if d.minVolume24h > 0 && opp.Volume24h < d.minVolume24h {
 		log.Printf("⚠️ Low volume for %s: $%.0f", opp.Pair, opp.Volume24h)
 		return false
 	}
 
 	// Max spread (підозріло якщо занадто великий)
-	if opp.SpreadPercent > d.config.MaxSpreadPercent {
+	if opp.SpreadPercent > d.maxSpreadPercent {
 		log.Printf("⚠️ Suspicious spread for %s: %.2f%%", opp.Pair, opp.SpreadPercent)
 		return false
 	}
@@ -249,6 +249,11 @@ func (d *Detector) OnOpportunity(callback OpportunityCallback) {
 	d.onOpportunity = callback
 }
 
+// OnArbitrageDetected alias для OnOpportunity (для сумісності)
+func (d *Detector) OnArbitrageDetected(callback OpportunityCallback) {
+	d.OnOpportunity(callback)
+}
+
 // GetStats повертає статистику детектора
 func (d *Detector) GetStats() *DetectorStats {
 	activeCount, _ := d.arbRepo.CountActive()
@@ -256,9 +261,15 @@ func (d *Detector) GetStats() *DetectorStats {
 	return &DetectorStats{
 		ActiveOpportunities: int(activeCount),
 		CachedIDs:          d.deduplicator.Size(),
-		MinProfit:          d.config.MinProfitPercent,
-		MinVolume:          d.config.MinVolume24h,
+		MinProfit:          d.minProfitPercent,
+		MinVolume:          d.minVolume24h,
 	}
+}
+
+// Stop зупиняє detector
+func (d *Detector) Stop() {
+	// Cleanup if needed
+	log.Println("🛑 Arbitrage detector stopped")
 }
 
 // DetectorStats статистика детектора
