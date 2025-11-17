@@ -540,6 +540,368 @@ POST /api/v1/defi/scrape
 }
 ```
 
+### Notification Management
+
+```bash
+# Список нотифікацій (з фільтрами)
+GET /api/v1/notifications?user_id=1&status=pending&page=1&limit=50
+
+# Query Parameters:
+# - user_id: фільтр за користувачем
+# - status: фільтр за статусом (pending, sent, failed)
+# - opportunity_id: фільтр за opportunity
+# - page, limit: пагінація (max 100)
+
+# Response
+{
+  "notifications": [
+    {
+      "id": 1,
+      "user_id": 123,
+      "opportunity_id": 45,
+      "status": "pending",
+      "type": "opportunity_alert",
+      "scheduled_for": "2024-01-20T15:00:00Z",
+      "retry_count": 0,
+      "created_at": "2024-01-20T14:55:00Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 50,
+    "total": 120,
+    "total_pages": 3
+  }
+}
+```
+
+```bash
+# Отримати нотифікацію
+GET /api/v1/notifications/:id
+
+# Response
+{
+  "id": 1,
+  "user_id": 123,
+  "opportunity_id": 45,
+  "status": "pending",
+  "type": "opportunity_alert",
+  "message": "New launchpool opportunity available!",
+  "scheduled_for": "2024-01-20T15:00:00Z",
+  "retry_count": 0,
+  "max_retries": 3,
+  "error_message": "",
+  "user": { ... },
+  "opportunity": { ... },
+  "created_at": "2024-01-20T14:55:00Z"
+}
+```
+
+```bash
+# Повторити failed нотифікацію
+POST /api/v1/notifications/:id/retry
+
+# Response
+{
+  "message": "Notification queued for retry",
+  "notification": { ... }
+}
+```
+
+```bash
+# Повторити всі failed нотифікації
+POST /api/v1/notifications/retry-all?limit=100
+
+# Response
+{
+  "message": "Failed notifications queued for retry",
+  "reset_count": 45,
+  "total_failed": 50
+}
+```
+
+```bash
+# Видалити нотифікацію
+DELETE /api/v1/notifications/:id
+
+# Response
+{
+  "message": "Notification deleted successfully",
+  "notification_id": 1
+}
+```
+
+```bash
+# Статистика нотифікацій
+GET /api/v1/notifications/stats
+
+# Response
+{
+  "pending": 120,
+  "sent": 15000,
+  "failed": 45,
+  "total": 15165,
+  "by_status": {
+    "pending": 120,
+    "sent": 15000,
+    "failed": 45
+  }
+}
+```
+
+### System Management
+
+```bash
+# Системний статус (детальний)
+GET /api/v1/system/status
+
+# Response
+{
+  "status": "healthy",
+  "uptime": "72h15m30s",
+  "version": "1.0.0",
+  "system": {
+    "go_version": "go1.25.3",
+    "goroutines": 25,
+    "memory_alloc_mb": 45,
+    "memory_total_mb": 120,
+    "memory_sys_mb": 78,
+    "gc_runs": 15,
+    "last_gc": "2024-01-20T15:30:00Z"
+  },
+  "database": {
+    "users": {"total": 1500},
+    "opportunities": {"active": 25},
+    "arbitrage": {"active": 8},
+    "defi": {"active": 15},
+    "notifications": {
+      "pending": 120,
+      "sent": 15000,
+      "failed": 45
+    }
+  },
+  "timestamp": "2024-01-20T15:35:00Z"
+}
+```
+
+```bash
+# Health check (простий)
+GET /api/v1/system/health
+
+# Response
+{
+  "status": "healthy",
+  "uptime": "72h15m30s"
+}
+```
+
+```bash
+# Запустити всі scrapers вручну
+POST /api/v1/system/scrapers/trigger
+
+# Response
+{
+  "message": "All scrapers triggered successfully",
+  "scrapers": ["binance", "bybit", "defi"],
+  "triggered_at": "2024-01-20T15:35:00Z"
+}
+```
+
+```bash
+# Запустити конкретний scraper
+POST /api/v1/system/scrapers/{name}/trigger
+
+# Valid names: binance, bybit, defi
+
+# Response
+{
+  "message": "Scraper triggered successfully",
+  "scraper": "binance",
+  "triggered_at": "2024-01-20T15:35:00Z"
+}
+```
+
+```bash
+# Статус scrapers
+GET /api/v1/system/scrapers/status
+
+# Response
+{
+  "scrapers": [
+    {
+      "name": "binance",
+      "status": "active",
+      "last_run": "2024-01-20T15:30:00Z",
+      "next_run": "2024-01-20T15:35:00Z",
+      "success_rate": 98.5,
+      "total_runs": 1440
+    },
+    {
+      "name": "bybit",
+      "status": "active",
+      "last_run": "2024-01-20T15:30:00Z",
+      "next_run": "2024-01-20T15:35:00Z",
+      "success_rate": 97.2,
+      "total_runs": 1440
+    },
+    {
+      "name": "defi",
+      "status": "active",
+      "last_run": "2024-01-20T15:00:00Z",
+      "next_run": "2024-01-20T16:00:00Z",
+      "success_rate": 95.8,
+      "total_runs": 48
+    }
+  ],
+  "schedule": {
+    "binance": "*/5 * * * *",
+    "bybit": "*/5 * * * *",
+    "defi": "0 * * * *"
+  }
+}
+```
+
+```bash
+# Очистити кеш
+POST /api/v1/system/cache/clear
+
+# Response
+{
+  "message": "Cache cleared successfully",
+  "cleared_at": "2024-01-20T15:35:00Z"
+}
+```
+
+```bash
+# Перезапустити notification dispatcher
+POST /api/v1/system/notifications/restart
+
+# Response
+{
+  "message": "Notification dispatcher restart triggered",
+  "triggered_at": "2024-01-20T15:35:00Z"
+}
+```
+
+### Broadcast System
+
+```bash
+# Відправити broadcast повідомлення
+POST /api/v1/broadcast/send
+
+# Request body
+{
+  "message": "Important update: New features available!",
+  "filters": {
+    "subscription_tier": "all",  // all, free, premium
+    "is_active": true,
+    "language": "en"
+  },
+  "options": {
+    "schedule_for": "2024-01-20T16:00:00Z"  // Optional
+  }
+}
+
+# Response
+{
+  "broadcast": {
+    "id": 123,
+    "message": "Important update: New features available!",
+    "target_count": 1500,
+    "status": "queued",
+    "created_at": "2024-01-20T15:35:00Z"
+  },
+  "note": "Broadcast queued successfully. Users will receive messages shortly."
+}
+```
+
+```bash
+# Історія broadcasts
+GET /api/v1/broadcast/history?page=1&limit=20
+
+# Response
+{
+  "broadcasts": [
+    {
+      "id": 1,
+      "message": "Welcome to our new feature update!",
+      "target_count": 1500,
+      "sent_count": 1500,
+      "failed_count": 0,
+      "status": "completed",
+      "created_at": "2024-01-19T10:00:00Z",
+      "completed_at": "2024-01-19T11:00:00Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 15,
+    "total_pages": 1
+  }
+}
+```
+
+```bash
+# Деталі broadcast
+GET /api/v1/broadcast/:id
+
+# Response
+{
+  "broadcast": {
+    "id": 1,
+    "message": "Welcome to our new feature update!",
+    "filters": {
+      "subscription_tier": "all",
+      "is_active": true
+    },
+    "stats": {
+      "target_count": 1500,
+      "sent_count": 1500,
+      "failed_count": 0,
+      "open_rate": 68.5,
+      "click_rate": 12.3
+    },
+    "status": "completed",
+    "created_at": "2024-01-19T10:00:00Z",
+    "started_at": "2024-01-19T10:00:00Z",
+    "completed_at": "2024-01-19T11:00:00Z"
+  }
+}
+```
+
+```bash
+# Статистика broadcasts
+GET /api/v1/broadcast/stats
+
+# Response
+{
+  "total_broadcasts": 15,
+  "completed": 12,
+  "in_progress": 2,
+  "scheduled": 1,
+  "cancelled": 0,
+  "total_messages_sent": 45000,
+  "average_success_rate": 98.7,
+  "last_30_days": {
+    "broadcasts": 8,
+    "messages": 28000
+  }
+}
+```
+
+```bash
+# Скасувати broadcast
+POST /api/v1/broadcast/:id/cancel
+
+# Response
+{
+  "message": "Broadcast cancelled successfully",
+  "broadcast_id": 1,
+  "cancelled_at": "2024-01-20T15:35:00Z"
+}
+```
+
 ### Authentication
 
 ```bash
@@ -654,26 +1016,29 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
 
 ```
 internal/api/
-├── server.go                    # HTTP server
-├── middleware/                  # Middleware
-│   ├── logging.go               # Request logging
-│   ├── recovery.go              # Panic recovery
-│   ├── cors.go                  # CORS headers
-│   ├── auth.go                  # JWT authentication
-│   └── ratelimit.go             # Rate limiting
-├── handlers/                    # Request handlers
-│   ├── health_handler.go        # Health check
-│   ├── user_handler.go          # User management
-│   ├── stats_handler.go         # Statistics
-│   ├── auth_handler.go          # Authentication (login/logout)
-│   ├── opportunity_handler.go   # Opportunities management
-│   ├── arbitrage_handler.go     # Arbitrage management
-│   └── defi_handler_api.go      # DeFi management
-├── auth/                        # Authentication
-│   ├── jwt.go                   # JWT manager
-│   └── token.go                 # Token helpers
-└── websocket/                   # WebSocket (TODO)
-    └── monitor.go               # Real-time monitoring
+├── server.go                     # HTTP server
+├── middleware/                   # Middleware
+│   ├── logging.go                # Request logging
+│   ├── recovery.go               # Panic recovery
+│   ├── cors.go                   # CORS headers
+│   ├── auth.go                   # JWT authentication
+│   └── ratelimit.go              # Rate limiting
+├── handlers/                     # Request handlers
+│   ├── health_handler.go         # Health check
+│   ├── user_handler.go           # User management
+│   ├── stats_handler.go          # Statistics
+│   ├── auth_handler.go           # Authentication (login/logout)
+│   ├── opportunity_handler.go    # Opportunities management
+│   ├── arbitrage_handler.go      # Arbitrage management
+│   ├── defi_handler_api.go       # DeFi management
+│   ├── notification_handler.go   # Notification management
+│   ├── system_handler.go         # System control & monitoring
+│   └── broadcast_handler.go      # Broadcast system
+├── auth/                         # Authentication
+│   ├── jwt.go                    # JWT manager
+│   └── token.go                  # Token helpers
+└── websocket/                    # WebSocket (Future)
+    └── monitor.go                # Real-time monitoring
 ```
 
 ## 🧪 Testing
@@ -710,12 +1075,12 @@ curl http://localhost:8080/api/v1/users
 - [x] Arbitrage management (list, stats, exchanges)
 - [x] DeFi management (list, stats, protocols, chains, manual scrape)
 
-### Phase 3 - Planned
-- [ ] Notification management endpoints
-- [ ] WebSocket real-time monitoring
-- [ ] Broadcast system
-- [ ] Payment management (Stripe integration)
-- [ ] System control endpoints (restart scrapers, clear cache)
+### Phase 3 - ✅ Completed
+- [x] Notification management endpoints (list, get, retry, delete, stats)
+- [x] System control endpoints (status, health, scrapers, cache, dispatcher)
+- [x] Broadcast system (send, history, stats, cancel)
+- [ ] Payment management (Stripe integration) - Postponed
+- [ ] WebSocket real-time monitoring - Postponed
 
 ### Phase 4 - Future
 - [ ] Swagger/OpenAPI documentation

@@ -36,13 +36,16 @@ type Server struct {
 	rateLimiter *middleware.RateLimiter
 
 	// Handlers
-	healthHandler *handlers.HealthHandler
-	authHandler   *handlers.AuthHandler
-	userHandler   *handlers.UserHandler
-	statsHandler  *handlers.StatsHandler
-	oppHandler    *handlers.OpportunityHandler
-	arbHandler    *handlers.ArbitrageHandler
-	defiHandler   *handlers.DeFiHandler
+	healthHandler     *handlers.HealthHandler
+	authHandler       *handlers.AuthHandler
+	userHandler       *handlers.UserHandler
+	statsHandler      *handlers.StatsHandler
+	oppHandler        *handlers.OpportunityHandler
+	arbHandler        *handlers.ArbitrageHandler
+	defiHandler       *handlers.DeFiHandler
+	notifHandler      *handlers.NotificationHandler
+	systemHandler     *handlers.SystemHandler
+	broadcastHandler  *handlers.BroadcastHandler
 }
 
 // NewServer створює новий Admin API server
@@ -81,6 +84,9 @@ func NewServer(
 	s.oppHandler = handlers.NewOpportunityHandler(oppRepo)
 	s.arbHandler = handlers.NewArbitrageHandler(arbRepo)
 	s.defiHandler = handlers.NewDeFiHandler(defiRepo)
+	s.notifHandler = handlers.NewNotificationHandler(notifRepo, userRepo, oppRepo)
+	s.systemHandler = handlers.NewSystemHandler(userRepo, oppRepo, arbRepo, defiRepo, notifRepo)
+	s.broadcastHandler = handlers.NewBroadcastHandler(userRepo)
 
 	// Setup router
 	s.setupRouter()
@@ -157,6 +163,30 @@ func (s *Server) setupRouter() {
 	// Statistics (viewer+)
 	protected.HandleFunc("/stats/dashboard", s.statsHandler.Dashboard).Methods("GET")
 	protected.HandleFunc("/stats/users", s.statsHandler.UserStats).Methods("GET")
+
+	// Notification management (viewer+ for GET, admin+ for modifications)
+	protected.HandleFunc("/notifications", s.notifHandler.ListNotifications).Methods("GET")
+	protected.HandleFunc("/notifications/{id}", s.notifHandler.GetNotification).Methods("GET")
+	protected.HandleFunc("/notifications/stats", s.notifHandler.GetNotificationStats).Methods("GET")
+	adminRoutes.HandleFunc("/notifications/{id}/retry", s.notifHandler.RetryNotification).Methods("POST")
+	adminRoutes.HandleFunc("/notifications/{id}", s.notifHandler.DeleteNotification).Methods("DELETE")
+	adminRoutes.HandleFunc("/notifications/retry-all", s.notifHandler.RetryAllFailed).Methods("POST")
+
+	// System management (admin+)
+	protected.HandleFunc("/system/status", s.systemHandler.GetSystemStatus).Methods("GET")
+	protected.HandleFunc("/system/health", s.systemHandler.GetHealthCheck).Methods("GET")
+	adminRoutes.HandleFunc("/system/scrapers/trigger", s.systemHandler.TriggerAllScrapers).Methods("POST")
+	adminRoutes.HandleFunc("/system/scrapers/{name}/trigger", s.systemHandler.TriggerScraper).Methods("POST")
+	protected.HandleFunc("/system/scrapers/status", s.systemHandler.GetScraperStatus).Methods("GET")
+	adminRoutes.HandleFunc("/system/cache/clear", s.systemHandler.ClearCache).Methods("POST")
+	adminRoutes.HandleFunc("/system/notifications/restart", s.systemHandler.RestartNotificationDispatcher).Methods("POST")
+
+	// Broadcast system (admin+)
+	adminRoutes.HandleFunc("/broadcast/send", s.broadcastHandler.SendBroadcast).Methods("POST")
+	protected.HandleFunc("/broadcast/history", s.broadcastHandler.GetBroadcastHistory).Methods("GET")
+	protected.HandleFunc("/broadcast/{id}", s.broadcastHandler.GetBroadcast).Methods("GET")
+	protected.HandleFunc("/broadcast/stats", s.broadcastHandler.GetBroadcastStats).Methods("GET")
+	adminRoutes.HandleFunc("/broadcast/{id}/cancel", s.broadcastHandler.CancelBroadcast).Methods("POST")
 
 	s.router = r
 }
