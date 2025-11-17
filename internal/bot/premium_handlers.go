@@ -288,3 +288,99 @@ func (b *Bot) daysUntil(t time.Time) int {
 
 	return int(d.Hours() / 24)
 }
+
+// handleClient показує інформацію про Premium Trading Client
+func (b *Bot) handleClient(message *tgbotapi.Message) {
+	chatID := message.Chat.ID
+	userID := message.From.ID
+
+	user, err := b.userRepo.GetByTelegramID(userID)
+	if err != nil || user == nil {
+		b.sendError(chatID)
+		return
+	}
+
+	if !user.IsPremium() {
+		text := "⚠️ Premium Trading Client доступний тільки для Premium користувачів.\n\n" +
+			"Хочеш спробувати Premium? /buy_premium"
+
+		msg := tgbotapi.NewMessage(chatID, text)
+		msg.ReplyMarkup = b.buildPremiumKeyboard()
+		b.sendMessage(msg)
+		return
+	}
+
+	text := `🖥 <b>Premium Trading Client</b>
+
+Desktop додаток для автоматичної торгівлі арбітражем на твоїх пристроях!
+
+<b>Переваги:</b>
+🔐 API ключі зберігаються на твоєму пристрої
+⚡ Миттєве виконання трейдів
+💰 Автоматична торгівля 24/7
+📊 Детальна статистика
+🎯 Повний контроль над коштами
+
+<b>Завантаження:</b>
+🪟 Windows: bit.ly/client-win
+🐧 Linux: bit.ly/client-linux
+🍎 MacOS: bit.ly/client-mac
+
+📖 Інструкція: bit.ly/client-docs
+🔑 Налаштування API ключів: bit.ly/client-api
+
+<b>Статистика:</b>
+Подивись свою статистику торгівлі: /clientstats`
+
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ParseMode = "HTML"
+	b.sendMessage(msg)
+
+	log.Printf("✅ User %d requested client info", user.ID)
+}
+
+// handleClientStats показує статистику торгівлі користувача
+func (b *Bot) handleClientStats(message *tgbotapi.Message) {
+	chatID := message.Chat.ID
+	userID := message.From.ID
+
+	user, err := b.userRepo.GetByTelegramID(userID)
+	if err != nil || user == nil {
+		b.sendError(chatID)
+		return
+	}
+
+	if !user.IsPremium() {
+		text := "⚠️ Статистика доступна тільки для Premium користувачів.\n\n" +
+			"Хочеш спробувати Premium? /buy_premium"
+
+		msg := tgbotapi.NewMessage(chatID, text)
+		msg.ReplyMarkup = b.buildPremiumKeyboard()
+		b.sendMessage(msg)
+		return
+	}
+
+	// TODO: Отримати статистику через clientStatsRepo коли він буде доданий до Bot
+	// Поки що показуємо заглушку
+	text := `📊 <b>Твоя Статистика Торгівлі</b>
+
+🔄 Всього трейдів: 0
+✅ Успішних: 0
+❌ Провалених: 0
+
+💰 Чистий прибуток: $0.00
+📈 Win rate: 0%
+🏆 Кращий трейд: $0.00
+
+⏰ Остання торгівля: Ніколи
+
+<i>Статистика оновиться після першого трейду через Premium Client</i>
+
+Завантажити клієнт: /client`
+
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ParseMode = "HTML"
+	b.sendMessage(msg)
+
+	log.Printf("✅ User %d requested client stats", user.ID)
+}

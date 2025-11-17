@@ -113,6 +113,10 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 		b.handleDeFi(message)
 	case CommandSupport:
 		b.handleSupport(message)
+	case "client":
+		b.handleClient(message)
+	case "clientstats":
+		b.handleClientStats(message)
 	default:
 		b.handleUnknown(message)
 	}
