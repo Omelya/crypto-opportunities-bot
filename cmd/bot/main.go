@@ -339,6 +339,16 @@ func startArbitrageMonitoring(
 		log.Printf("✅ Connected to %s WebSocket (%d pairs)", exchange, len(cfg.Arbitrage.Pairs))
 	}
 
+	// Validate that at least one exchange connected successfully
+	connectedExchanges := obManager.GetExchanges()
+	if len(connectedExchanges) == 0 {
+		log.Printf("❌ Failed to connect to any exchanges - arbitrage monitoring cannot start")
+		log.Printf("   Check exchange WebSocket endpoints and network connectivity")
+		return nil
+	}
+
+	log.Printf("📊 Successfully connected to %d exchanges: %v", len(connectedExchanges), connectedExchanges)
+
 	// Create Calculator
 	calculator := arbitrage.NewCalculator()
 

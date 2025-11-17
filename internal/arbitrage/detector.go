@@ -259,7 +259,11 @@ func (d *Detector) GetStats() *DetectorStats {
 }
 
 func (d *Detector) Stop() {
+	// Clear update callback
 	d.obManager.OnUpdate(nil)
+
+	// Disconnect all WebSocket connections
+	d.obManager.DisconnectAll()
 
 	log.Println("✅ Arbitrage detector stopped")
 }

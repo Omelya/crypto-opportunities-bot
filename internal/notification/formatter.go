@@ -5,12 +5,24 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
-type Formatter struct{}
+type Formatter struct {
+	titleCaser cases.Caser
+}
 
 func NewFormatter() *Formatter {
-	return &Formatter{}
+	return &Formatter{
+		titleCaser: cases.Title(language.English),
+	}
+}
+
+// titleCase замінює deprecated strings.Title()
+func (f *Formatter) titleCase(s string) string {
+	return f.titleCaser.String(s)
 }
 
 func (f *Formatter) FormatOpportunity(opp *models.Opportunity) string {
@@ -20,7 +32,7 @@ func (f *Formatter) FormatOpportunity(opp *models.Opportunity) string {
 
 	builder.WriteString(fmt.Sprintf("%s <b>%s</b>\n\n", emoji, opp.Title))
 
-	builder.WriteString(fmt.Sprintf("🏦 Біржа: <b>%s</b>\n", strings.Title(opp.Exchange)))
+	builder.WriteString(fmt.Sprintf("🏦 Біржа: <b>%s</b>\n", f.titleCase(opp.Exchange)))
 
 	if opp.Reward != "" {
 		builder.WriteString(fmt.Sprintf("💰 Винагорода: <b>%s</b>\n", opp.Reward))
@@ -103,7 +115,7 @@ func (f *Formatter) FormatDailyDigest(opportunities []*models.Opportunity, user 
 			}
 
 			builder.WriteString(fmt.Sprintf("   • %s - %s%s%s\n",
-				strings.Title(opp.Exchange),
+				f.titleCase(opp.Exchange),
 				f.truncateTitle(opp.Title, 40),
 				roi,
 				duration,
@@ -152,8 +164,8 @@ func (f *Formatter) FormatArbitrage(arb *models.ArbitrageOpportunity) string {
 
 	builder.WriteString(fmt.Sprintf("%s <b>АРБІТРАЖ!</b>\n\n", emoji))
 	builder.WriteString(fmt.Sprintf("Пара: <b>%s</b>\n", arb.Pair))
-	builder.WriteString(fmt.Sprintf("🟢 Купити: <b>%s</b> @ $%.4f\n", strings.Title(arb.ExchangeBuy), arb.PriceBuy))
-	builder.WriteString(fmt.Sprintf("🔴 Продати: <b>%s</b> @ $%.4f\n\n", strings.Title(arb.ExchangeSell), arb.PriceSell))
+	builder.WriteString(fmt.Sprintf("🟢 Купити: <b>%s</b> @ $%.4f\n", f.titleCase(arb.ExchangeBuy), arb.PriceBuy))
+	builder.WriteString(fmt.Sprintf("🔴 Продати: <b>%s</b> @ $%.4f\n\n", f.titleCase(arb.ExchangeSell), arb.PriceSell))
 
 	builder.WriteString(fmt.Sprintf("💵 Валовий profit: <b>%.2f%%</b>\n", arb.ProfitPercent))
 	builder.WriteString(fmt.Sprintf("📊 На $1000: <b>$%.2f</b>\n", arb.ProfitUSD))
@@ -185,8 +197,8 @@ func (f *Formatter) FormatArbitrageAlert(exchangeBuy, exchangeSell, pair string,
 
 	builder.WriteString("🔥 <b>АРБІТРАЖ!</b>\n\n")
 	builder.WriteString(fmt.Sprintf("Пара: <b>%s</b>\n", pair))
-	builder.WriteString(fmt.Sprintf("Купити: %s <b>$%.2f</b>\n", strings.Title(exchangeBuy), priceBuy))
-	builder.WriteString(fmt.Sprintf("Продати: %s <b>$%.2f</b>\n\n", strings.Title(exchangeSell), priceSell))
+	builder.WriteString(fmt.Sprintf("Купити: %s <b>$%.2f</b>\n", f.titleCase(exchangeBuy), priceBuy))
+	builder.WriteString(fmt.Sprintf("Продати: %s <b>$%.2f</b>\n\n", f.titleCase(exchangeSell), priceSell))
 
 	builder.WriteString(fmt.Sprintf("💰 Profit: <b>%.2f%%</b>\n", profitPercent))
 	builder.WriteString(fmt.Sprintf("📊 На $1000: <b>$%.2f profit</b>\n", profitPercent*10))
@@ -215,8 +227,8 @@ func (f *Formatter) FormatDeFi(defi *models.DeFiOpportunity) string {
 	builder.WriteString(fmt.Sprintf("%s <b>DeFi Opportunity</b>\n\n", emoji))
 
 	// Protocol and Chain
-	builder.WriteString(fmt.Sprintf("🏦 Protocol: <b>%s</b>\n", strings.Title(defi.Protocol)))
-	builder.WriteString(fmt.Sprintf("⛓️ Chain: <b>%s</b>\n", strings.Title(defi.Chain)))
+	builder.WriteString(fmt.Sprintf("🏦 Protocol: <b>%s</b>\n", f.titleCase(defi.Protocol)))
+	builder.WriteString(fmt.Sprintf("⛓️ Chain: <b>%s</b>\n", f.titleCase(defi.Chain)))
 	builder.WriteString(fmt.Sprintf("💧 Pool: <b>%s</b>\n\n", defi.GetDisplayName()))
 
 	// Profitability
