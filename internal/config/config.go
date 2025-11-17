@@ -18,6 +18,7 @@ type Config struct {
 	Payment   PaymentConfig   `yaml:"payment" mapstructure:"payment"`
 	Arbitrage ArbitrageConfig `yaml:"arbitrage" mapstructure:"arbitrage"`
 	DeFi      DeFiConfig      `yaml:"defi" mapstructure:"defi"`
+	Admin     AdminConfig     `yaml:"admin" mapstructure:"admin"`
 }
 
 type AppConfig struct {
@@ -84,6 +85,15 @@ type DeFiConfig struct {
 	MaxILRisk      float64  `yaml:"max_il_risk" mapstructure:"max_il_risk"`
 	MinVolume24h   float64  `yaml:"min_volume_24h" mapstructure:"min_volume_24h"`
 	ScrapeInterval int      `yaml:"scrape_interval" mapstructure:"scrape_interval"` // minutes
+}
+
+type AdminConfig struct {
+	Enabled        bool     `yaml:"enabled" mapstructure:"enabled"`
+	Host           string   `yaml:"host" mapstructure:"host"`
+	Port           int      `yaml:"port" mapstructure:"port"`
+	JWTSecret      string   `yaml:"jwt_secret" mapstructure:"jwt_secret"`
+	AllowedOrigins []string `yaml:"allowed_origins" mapstructure:"allowed_origins"`
+	RateLimit      int      `yaml:"rate_limit" mapstructure:"rate_limit"` // requests per minute
 }
 
 func LoadConfig(configPath string) (*Config, error) {
