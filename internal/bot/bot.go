@@ -2,6 +2,7 @@ package bot
 
 import (
 	"crypto-opportunities-bot/internal/config"
+	"crypto-opportunities-bot/internal/models"
 	"crypto-opportunities-bot/internal/payment"
 	"crypto-opportunities-bot/internal/repository"
 	"log"
@@ -162,18 +163,7 @@ func (b *Bot) handleCallback(callback *tgbotapi.CallbackQuery) {
 	}
 
 	// Settings callbacks
-	if strings.HasPrefix(data, "settings_") ||
-		strings.HasPrefix(data, "set_capital_") ||
-		strings.HasPrefix(data, "set_risk_") ||
-		strings.HasPrefix(data, "toggle_type_") ||
-		strings.HasPrefix(data, "toggle_exchange_") ||
-		strings.HasPrefix(data, "set_roi_") ||
-		strings.HasPrefix(data, "set_investment_") ||
-		strings.HasPrefix(data, "toggle_notify_") ||
-		data == "back_settings" ||
-		data == "save_types" ||
-		data == "save_exchanges" ||
-		data == "save_notifications" {
+	if strings.HasPrefix(data, "settings_") && data != CallbackSettingsBack {
 		b.handleSettingsCallback(callback)
 		return
 	}
@@ -346,4 +336,11 @@ func (b *Bot) handleSettingsUpdate(callback *tgbotapi.CallbackQuery) {
 
 		b.showSettingsMenu(chatID, user, prefs)
 	}
+}
+
+func (b *Bot) getUserAndPrefs(userID int64) (*models.User, *models.UserPreferences) {
+	user, _ := b.userRepo.GetByTelegramID(userID)
+	prefs, _ := b.prefsRepo.GetByUserID(user.ID)
+
+	return user, prefs
 }
