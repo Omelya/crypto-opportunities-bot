@@ -59,6 +59,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&models.Subscription{},
 		&models.Payment{},
 		&models.ArbitrageOpportunity{},
+		&models.DeFiOpportunity{},
 	)
 }
 
