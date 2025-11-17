@@ -152,7 +152,19 @@ func main() {
 		log.Printf("   Min TVL: $%.0f", cfg.DeFi.MinTVL)
 		log.Printf("   Max IL Risk: %.2f%%", cfg.DeFi.MaxILRisk)
 
-		// TODO: Add DeFi scraper scheduler (separate from regular scrapers due to longer interval)
+		// Start DeFi monitoring scheduler
+		defiTicker := startDeFiMonitoring(defiScraper, cfg.DeFi.ScrapeInterval)
+		defer defiTicker.Stop()
+
+		// Initial scraping if in development mode
+		if cfg.App.Environment == "development" {
+			log.Println("Running initial DeFi scraping...")
+			go func() {
+				if _, err := defiScraper.ScrapeAll(); err != nil {
+					log.Printf("⚠️ Initial DeFi scraping failed: %v", err)
+				}
+			}()
+		}
 	} else {
 		log.Printf("⚠️ DeFi monitoring disabled in config")
 	}
@@ -405,5 +417,22 @@ func startPremiumWatcher(
 	}()
 
 	log.Println("👀 Premium watcher started (every 5 min)")
+	return ticker
+}
+
+func startDeFiMonitoring(defiScraper *scraper.DeFiScraper, intervalMinutes int) *time.Ticker {
+	interval := time.Duration(intervalMinutes) * time.Minute
+	ticker := time.NewTicker(interval)
+
+	go func() {
+		for range ticker.C {
+			log.Printf("🌾 Running DeFi scraping (interval: %d min)...", intervalMinutes)
+			if _, err := defiScraper.ScrapeAll(); err != nil {
+				log.Printf("❌ DeFi scraping error: %v", err)
+			}
+		}
+	}()
+
+	log.Printf("✅ DeFi monitoring started (every %d min)", intervalMinutes)
 	return ticker
 }
