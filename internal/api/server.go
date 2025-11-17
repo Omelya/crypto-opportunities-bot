@@ -29,6 +29,7 @@ type Server struct {
 	defiRepo   repository.DeFiRepository
 	notifRepo  repository.NotificationRepository
 	adminRepo  repository.AdminRepository
+	actionRepo repository.UserActionRepository
 
 	// Auth & Middleware
 	jwtManager  *auth.JWTManager
@@ -39,6 +40,9 @@ type Server struct {
 	authHandler   *handlers.AuthHandler
 	userHandler   *handlers.UserHandler
 	statsHandler  *handlers.StatsHandler
+	oppHandler    *handlers.OpportunityHandler
+	arbHandler    *handlers.ArbitrageHandler
+	defiHandler   *handlers.DeFiHandler
 }
 
 // NewServer створює новий Admin API server
@@ -50,15 +54,17 @@ func NewServer(
 	defiRepo repository.DeFiRepository,
 	notifRepo repository.NotificationRepository,
 	adminRepo repository.AdminRepository,
+	actionRepo repository.UserActionRepository,
 ) *Server {
 	s := &Server{
-		config:    cfg,
-		userRepo:  userRepo,
-		oppRepo:   oppRepo,
-		arbRepo:   arbRepo,
-		defiRepo:  defiRepo,
-		notifRepo: notifRepo,
-		adminRepo: adminRepo,
+		config:     cfg,
+		userRepo:   userRepo,
+		oppRepo:    oppRepo,
+		arbRepo:    arbRepo,
+		defiRepo:   defiRepo,
+		notifRepo:  notifRepo,
+		adminRepo:  adminRepo,
+		actionRepo: actionRepo,
 	}
 
 	// Initialize JWT Manager
@@ -70,8 +76,11 @@ func NewServer(
 	// Initialize handlers
 	s.healthHandler = handlers.NewHealthHandler()
 	s.authHandler = handlers.NewAuthHandler(adminRepo, s.jwtManager)
-	s.userHandler = handlers.NewUserHandler(userRepo)
+	s.userHandler = handlers.NewUserHandler(userRepo, actionRepo, notifRepo)
 	s.statsHandler = handlers.NewStatsHandler(userRepo, oppRepo, arbRepo, defiRepo, notifRepo)
+	s.oppHandler = handlers.NewOpportunityHandler(oppRepo)
+	s.arbHandler = handlers.NewArbitrageHandler(arbRepo)
+	s.defiHandler = handlers.NewDeFiHandler(defiRepo)
 
 	// Setup router
 	s.setupRouter()
@@ -115,11 +124,35 @@ func (s *Server) setupRouter() {
 	protected.HandleFunc("/users", s.userHandler.ListUsers).Methods("GET")
 	protected.HandleFunc("/users/{id}", s.userHandler.GetUser).Methods("GET")
 	protected.HandleFunc("/users/{id}/stats", s.userHandler.GetUserStats).Methods("GET")
+	protected.HandleFunc("/users/{id}/actions", s.userHandler.GetUserActions).Methods("GET")
 
 	// User modifications (admin+)
 	adminRoutes := protected.PathPrefix("").Subrouter()
 	adminRoutes.Use(middleware.RequireRole(models.AdminRoleAdmin))
 	adminRoutes.HandleFunc("/users/{id}", s.userHandler.UpdateUser).Methods("PUT")
+	adminRoutes.HandleFunc("/users/{id}", s.userHandler.DeleteUser).Methods("DELETE")
+
+	// Opportunities management (viewer+ for GET, admin+ for modifications)
+	protected.HandleFunc("/opportunities", s.oppHandler.ListOpportunities).Methods("GET")
+	protected.HandleFunc("/opportunities/{id}", s.oppHandler.GetOpportunity).Methods("GET")
+	adminRoutes.HandleFunc("/opportunities", s.oppHandler.CreateOpportunity).Methods("POST")
+	adminRoutes.HandleFunc("/opportunities/{id}", s.oppHandler.UpdateOpportunity).Methods("PUT")
+	adminRoutes.HandleFunc("/opportunities/{id}", s.oppHandler.DeleteOpportunity).Methods("DELETE")
+	adminRoutes.HandleFunc("/opportunities/{id}/deactivate", s.oppHandler.DeactivateOpportunity).Methods("POST")
+
+	// Arbitrage management (viewer+)
+	protected.HandleFunc("/arbitrage", s.arbHandler.ListArbitrage).Methods("GET")
+	protected.HandleFunc("/arbitrage/{id}", s.arbHandler.GetArbitrage).Methods("GET")
+	protected.HandleFunc("/arbitrage/stats", s.arbHandler.GetArbitrageStats).Methods("GET")
+	protected.HandleFunc("/arbitrage/exchanges", s.arbHandler.GetExchangeStatus).Methods("GET")
+
+	// DeFi management (viewer+)
+	protected.HandleFunc("/defi", s.defiHandler.ListDeFi).Methods("GET")
+	protected.HandleFunc("/defi/{id}", s.defiHandler.GetDeFi).Methods("GET")
+	protected.HandleFunc("/defi/stats", s.defiHandler.GetDeFiStats).Methods("GET")
+	protected.HandleFunc("/defi/protocols", s.defiHandler.GetProtocols).Methods("GET")
+	protected.HandleFunc("/defi/chains", s.defiHandler.GetChains).Methods("GET")
+	adminRoutes.HandleFunc("/defi/scrape", s.defiHandler.TriggerDeFiScrape).Methods("POST")
 
 	// Statistics (viewer+)
 	protected.HandleFunc("/stats/dashboard", s.statsHandler.Dashboard).Methods("GET")

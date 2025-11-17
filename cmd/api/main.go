@@ -46,6 +46,7 @@ func main() {
 	defiRepo := repository.NewDeFiRepository(db)
 	notifRepo := repository.NewNotificationRepository(db)
 	adminRepo := repository.NewAdminRepository(db)
+	actionRepo := repository.NewUserActionRepository(db)
 
 	// Create default admin if environment variables are set
 	if username := os.Getenv("ADMIN_DEFAULT_USERNAME"); username != "" {
@@ -70,6 +71,7 @@ func main() {
 		defiRepo,
 		notifRepo,
 		adminRepo,
+		actionRepo,
 	)
 
 	// Start server in goroutine
