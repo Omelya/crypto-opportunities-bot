@@ -10,6 +10,7 @@ import (
 	"crypto-opportunities-bot/internal/models"
 	"crypto-opportunities-bot/internal/notification"
 	"crypto-opportunities-bot/internal/payment"
+	"crypto-opportunities-bot/internal/referral"
 	"crypto-opportunities-bot/internal/repository"
 	"crypto-opportunities-bot/internal/scraper"
 	"log"
@@ -60,6 +61,7 @@ func main() {
 	paymentRepo := repository.NewPaymentRepository(db)
 	arbRepo := repository.NewArbitrageRepository(db)
 	defiRepo := repository.NewDeFiRepository(db)
+	referralRepo := repository.NewReferralRepository(db)
 
 	botAPI, err := tgbotapi.NewBotAPI(cfg.Telegram.BotToken)
 	if err != nil {
@@ -113,9 +115,17 @@ func main() {
 		log.Printf("⚠️ Monobank not configured - payment features disabled")
 	}
 
+	// Referral service
+	referralService := referral.NewService(referralRepo, userRepo, subsRepo)
+	log.Printf("✅ Referral service initialized")
+
 	scraperService := scraper.NewScraperService(oppRepo)
 	scraperService.RegisterScraper(scraper.NewBinanceScraper())
 	scraperService.RegisterScraper(scraper.NewBybitScraper())
+	scraperService.RegisterScraper(scraper.NewOKXScraper())
+	scraperService.RegisterScraper(scraper.NewGateIOScraper())
+	scraperService.RegisterScraper(scraper.NewKrakenScraper())
+	log.Printf("✅ Registered 5 exchange scrapers (Binance, Bybit, OKX, Gate.io, Kraken)")
 
 	scraperService.OnNewOpportunity(func(opp *models.Opportunity) {
 		log.Printf("📢 Creating notifications for: %s", opp.Title)
@@ -228,7 +238,7 @@ func main() {
 		defer premiumWatcher.Stop()
 	}
 
-	telegramBot, err := bot.NewBot(cfg, userRepo, prefsRepo, oppRepo, actionRepo, subsRepo, arbRepo, defiRepo, paymentService)
+	telegramBot, err := bot.NewBot(cfg, userRepo, prefsRepo, oppRepo, actionRepo, subsRepo, arbRepo, defiRepo, paymentService, referralService)
 	if err != nil {
 		log.Fatalf("Failed to create bot: %v", err)
 	}

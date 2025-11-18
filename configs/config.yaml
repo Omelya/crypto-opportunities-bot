@@ -30,6 +30,12 @@ payment:
   redirect_url: "https://t.me/your_bot_username"
   webhook_port: "8081"
 
+referral:
+  enabled: true
+  referrer_reward_days: 30        # Days of premium for referrer
+  friend_discount_percent: 20     # Discount for referred friend
+  referral_expiry_days: 90        # Referral expires after 90 days if not activated
+
 arbitrage:
   enabled: true
   pairs:

@@ -13,6 +13,8 @@ const (
 	CommandSupport      = "support"
 	CommandArbitrage    = "arbitrage"
 	CommandDeFi         = "defi"
+	CommandReferral     = "referral"
+	CommandInvite       = "invite"
 )
 
 // Callback data для inline buttons
@@ -109,4 +111,8 @@ const (
 
 	// Arbitrage
 	CallbackRefreshArbitrage = "refresh_arbitrage"
+
+	// Referral
+	CallbackReferralStats = "referral_stats"
+	CallbackReferralInfo  = "referral_info"
 )

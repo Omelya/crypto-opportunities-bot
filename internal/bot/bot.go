@@ -4,6 +4,7 @@ import (
 	"crypto-opportunities-bot/internal/config"
 	"crypto-opportunities-bot/internal/models"
 	"crypto-opportunities-bot/internal/payment"
+	"crypto-opportunities-bot/internal/referral"
 	"crypto-opportunities-bot/internal/repository"
 	"log"
 	"strings"
@@ -21,8 +22,10 @@ type Bot struct {
 	arbRepo           repository.ArbitrageRepository
 	defiRepo          repository.DeFiRepository
 	paymentService    *payment.Service
+	referralService   *referral.Service
 	config            *config.Config
 	onboardingManager *OnboardingManager
+	botUsername       string
 }
 
 func NewBot(
@@ -35,6 +38,7 @@ func NewBot(
 	arbRepo repository.ArbitrageRepository,
 	defiRepo repository.DeFiRepository,
 	paymentService *payment.Service,
+	referralService *referral.Service,
 ) (*Bot, error) {
 	api, err := tgbotapi.NewBotAPI(cfg.Telegram.BotToken)
 	if err != nil {
@@ -55,8 +59,10 @@ func NewBot(
 		arbRepo:           arbRepo,
 		defiRepo:          defiRepo,
 		paymentService:    paymentService,
+		referralService:   referralService,
 		config:            cfg,
 		onboardingManager: NewOnboardingManager(),
+		botUsername:       api.Self.UserName,
 	}, nil
 }
 
@@ -113,6 +119,10 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 		b.handleDeFi(message)
 	case CommandSupport:
 		b.handleSupport(message)
+	case CommandReferral:
+		b.handleReferral(message)
+	case CommandInvite:
+		b.handleInvite(message)
 	case "client":
 		b.handleClient(message)
 	case "clientstats":
@@ -195,6 +205,12 @@ func (b *Bot) handleCallback(callback *tgbotapi.CallbackQuery) {
 	if strings.HasPrefix(data, "defi_protocol_") {
 		protocol := strings.TrimPrefix(data, "defi_protocol_")
 		b.handleDeFiByProtocol(callback, protocol)
+		return
+	}
+
+	// Referral callbacks
+	if data == CallbackReferralStats || data == CallbackReferralInfo {
+		b.handleReferralCallback(callback, data)
 		return
 	}
 
