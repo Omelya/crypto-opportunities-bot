@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"crypto-opportunities-bot/internal/analytics"
 	"crypto-opportunities-bot/internal/config"
 	"crypto-opportunities-bot/internal/models"
 	"crypto-opportunities-bot/internal/payment"
@@ -23,6 +24,7 @@ type Bot struct {
 	defiRepo          repository.DeFiRepository
 	whaleRepo         repository.WhaleRepository
 	paymentService    *payment.Service
+	analyticsService  *analytics.Service
 	referralService   *referral.Service
 	config            *config.Config
 	onboardingManager *OnboardingManager
@@ -41,6 +43,7 @@ func NewBot(
 	whaleRepo repository.WhaleRepository,
 	paymentService *payment.Service,
 	referralService *referral.Service,
+	analyticsService *analytics.Service,
 ) (*Bot, error) {
 	api, err := tgbotapi.NewBotAPI(cfg.Telegram.BotToken)
 	if err != nil {
@@ -63,6 +66,7 @@ func NewBot(
 		whaleRepo:         whaleRepo,
 		paymentService:    paymentService,
 		referralService:   referralService,
+		analyticsService:  analyticsService,
 		config:            cfg,
 		onboardingManager: NewOnboardingManager(),
 		botUsername:       api.Self.UserName,
@@ -109,7 +113,9 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 	case CommandSettings:
 		b.handleSettings(message)
 	case CommandStats:
-		b.handleStats(message)
+		b.handleMyStats(message)
+	case "analytics":
+		b.handleAnalytics(message)
 	case CommandPremium:
 		b.handlePremium(message)
 	case CommandBuyPremium:
@@ -223,6 +229,32 @@ func (b *Bot) handleCallback(callback *tgbotapi.CallbackQuery) {
 	if strings.HasPrefix(data, "whale_") {
 		action := data
 		b.handleWhaleCallback(callback, action)
+		return
+	}
+
+	// Analytics callbacks
+	if strings.HasPrefix(data, "analytics_") {
+		switch data {
+		case "analytics_top_opps":
+			b.handleTopOpportunities(callback)
+		case "analytics_top_users":
+			b.handleTopUsers(callback)
+		case "analytics_daily":
+			b.handleDailyReport(callback)
+		case "analytics_refresh":
+			b.handleAnalytics(&tgbotapi.Message{
+				Chat: &tgbotapi.Chat{ID: callback.Message.Chat.ID},
+				From: callback.From,
+			})
+		}
+		return
+	}
+
+	if data == "refresh_stats" {
+		b.handleMyStats(&tgbotapi.Message{
+			Chat: &tgbotapi.Chat{ID: callback.Message.Chat.ID},
+			From: callback.From,
+		})
 		return
 	}
 

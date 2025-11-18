@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto-opportunities-bot/internal/analytics"
 	"crypto-opportunities-bot/internal/arbitrage"
 	"crypto-opportunities-bot/internal/arbitrage/websocket"
 	"crypto-opportunities-bot/internal/bot"
@@ -62,6 +63,7 @@ func main() {
 	paymentRepo := repository.NewPaymentRepository(db)
 	arbRepo := repository.NewArbitrageRepository(db)
 	defiRepo := repository.NewDeFiRepository(db)
+	analyticsRepo := repository.NewAnalyticsRepository(db)
 	referralRepo := repository.NewReferralRepository(db)
 	whaleRepo := repository.NewWhaleRepository(db)
 
@@ -83,6 +85,10 @@ func main() {
 		whaleRepo,
 	)
 	log.Printf("✅ Notification service initialized")
+
+	// Analytics service
+	analyticsService := analytics.NewService(analyticsRepo, actionRepo, userRepo, oppRepo)
+	log.Printf("✅ Analytics service initialized")
 
 	// Payment service (Monobank)
 	var paymentService *payment.Service
@@ -260,6 +266,19 @@ func main() {
 	if cfg.App.Environment == "development" {
 		log.Println("Running initial cleanup...")
 		cleanupScheduler.RunNow()
+	}
+
+	// Analytics Scheduler (daily at 3:00 AM)
+	analyticsScheduler := analytics.NewScheduler(analyticsService)
+	if err := analyticsScheduler.Start(); err != nil {
+		log.Fatalf("Failed to start analytics scheduler: %v", err)
+	}
+	defer analyticsScheduler.Stop()
+
+	// Run initial analytics calculation if in development mode
+	if cfg.App.Environment == "development" {
+		log.Println("Running initial analytics calculation...")
+		analyticsScheduler.RunNow()
 	}
 
 	// Arbitrage System (Premium feature)
