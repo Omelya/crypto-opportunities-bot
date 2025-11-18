@@ -110,6 +110,8 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 		b.handleHelp(message)
 	case CommandToday:
 		b.handleToday(message)
+	case CommandAll:
+		b.handleAll(message)
 	case CommandSettings:
 		b.handleSettings(message)
 	case CommandStats:

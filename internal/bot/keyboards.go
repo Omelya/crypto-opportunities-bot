@@ -45,7 +45,7 @@ func (b *Bot) buildMainMenuKeyboard() tgbotapi.InlineKeyboardMarkup {
 			tgbotapi.NewInlineKeyboardButtonData("💰 Сьогодні", CallbackMenuToday),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📊 Всі можливості", CallbackMenuToday),
+			tgbotapi.NewInlineKeyboardButtonData("📊 Всі можливості", CallbackMenuAllOpportunities),
 		),
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("⚙️ Налаштування", CallbackMenuSettings),

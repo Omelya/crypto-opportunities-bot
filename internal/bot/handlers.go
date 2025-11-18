@@ -54,7 +54,8 @@ func (b *Bot) sendWelcomeBack(chatID int64, user *models.User) {
 	text := fmt.Sprintf(
 		"👋 З поверненням, %s!\n\n"+
 			"Що тебе цікавить?\n\n"+
-			"/today - Можливості на сьогодні\n"+
+			"/today - Нові можливості за сьогодні\n"+
+			"/all - Всі доступні можливості\n"+
 			"/stats - Твоя статистика\n"+
 			"/settings - Налаштування\n"+
 			"/premium - Дізнатись про Premium",
@@ -78,7 +79,8 @@ func (b *Bot) handleHelp(message *tgbotapi.Message) {
 
 /start - Почати роботу з ботом
 /help - Показати цю довідку
-/today - Можливості на сьогодні
+/today - Нові можливості за сьогодні
+/all - Всі доступні можливості
 /stats - Твоя статистика
 /settings - Налаштування
 /premium - Інформація про Premium
@@ -93,6 +95,48 @@ func (b *Bot) handleHelp(message *tgbotapi.Message) {
 }
 
 func (b *Bot) handleToday(message *tgbotapi.Message) {
+	chatID := message.Chat.ID
+	telegramID := message.From.ID
+
+	user, err := b.userRepo.GetByTelegramID(telegramID)
+	if err != nil || user == nil {
+		b.sendError(chatID)
+		return
+	}
+
+	prefs, err := b.prefsRepo.GetByUserID(user.ID)
+	if err != nil || prefs == nil {
+		text := "⚠️ Спочатку налаштуй свій профіль через /start"
+		msg := tgbotapi.NewMessage(chatID, text)
+		b.sendMessage(msg)
+		return
+	}
+
+	opportunities, err := b.getFilteredTodayOpportunities(user, prefs, 0)
+	if err != nil {
+		log.Printf("Error getting opportunities: %v", err)
+		b.sendError(chatID)
+		return
+	}
+
+	if len(opportunities) == 0 {
+		text := "🔍 На жаль, сьогодні немає нових можливостей, які відповідають твоїм критеріям.\n\n" +
+			"💡 Спробуй:\n" +
+			"• Подивитись /all - всі доступні можливості\n" +
+			"• Розширити фільтри у /settings\n" +
+			"• Додати більше бірж\n" +
+			"• Знизити мінімальний ROI"
+
+		msg := tgbotapi.NewMessage(chatID, text)
+		msg.ReplyMarkup = b.buildMainMenuKeyboard()
+		b.sendMessage(msg)
+		return
+	}
+
+	b.sendOpportunitiesList(chatID, user, opportunities, 0, "today")
+}
+
+func (b *Bot) handleAll(message *tgbotapi.Message) {
 	chatID := message.Chat.ID
 	telegramID := message.From.ID
 
@@ -265,6 +309,35 @@ func (b *Bot) getFilteredOpportunities(user *models.User, prefs *models.UserPref
 	limit := 20
 
 	opportunities, err := b.oppRepo.ListActive(1000, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	var filtered []*models.Opportunity
+
+	for _, opp := range opportunities {
+		if !b.shouldShowOpportunity(user, prefs, opp) {
+			continue
+		}
+		filtered = append(filtered, opp)
+	}
+
+	start := offset
+	end := offset + limit
+	if start > len(filtered) {
+		return []*models.Opportunity{}, nil
+	}
+	if end > len(filtered) {
+		end = len(filtered)
+	}
+
+	return filtered[start:end], nil
+}
+
+func (b *Bot) getFilteredTodayOpportunities(user *models.User, prefs *models.UserPreferences, offset int) ([]*models.Opportunity, error) {
+	limit := 20
+
+	opportunities, err := b.oppRepo.ListCreatedToday(1000, 0)
 	if err != nil {
 		return nil, err
 	}

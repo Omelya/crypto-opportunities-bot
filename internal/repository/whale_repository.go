@@ -190,8 +190,8 @@ func (r *whaleRepository) GetStats24h(chain, token string) (*models.WhaleStats, 
 		MaxSize     float64
 	}
 	if err := query.Select(
-		"COALESCE(SUM(amount_usd), 0) as total_volume, "+
-			"COALESCE(AVG(amount_usd), 0) as avg_size, "+
+		"COALESCE(SUM(amount_usd), 0) as total_volume, " +
+			"COALESCE(AVG(amount_usd), 0) as avg_size, " +
 			"COALESCE(MAX(amount_usd), 0) as max_size",
 	).Scan(&volumeResult).Error; err != nil {
 		return nil, err
@@ -211,8 +211,8 @@ func (r *whaleRepository) GetStats24h(chain, token string) (*models.WhaleStats, 
 
 	// Net flow
 	var netFlow struct {
-		Accumulation  float64
-		Distribution  float64
+		Accumulation float64
+		Distribution float64
 	}
 	query.Where("direction = ?", models.WhaleDirectionExchangeToWallet).
 		Select("COALESCE(SUM(amount_usd), 0) as accumulation").Scan(&netFlow)
