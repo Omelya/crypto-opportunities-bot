@@ -18,6 +18,7 @@ type Config struct {
 	Payment   PaymentConfig   `yaml:"payment" mapstructure:"payment"`
 	Arbitrage ArbitrageConfig `yaml:"arbitrage" mapstructure:"arbitrage"`
 	DeFi      DeFiConfig      `yaml:"defi" mapstructure:"defi"`
+	Whale     WhaleConfig     `yaml:"whale" mapstructure:"whale"`
 	Admin     AdminConfig     `yaml:"admin" mapstructure:"admin"`
 }
 
@@ -87,6 +88,17 @@ type DeFiConfig struct {
 	ScrapeInterval int      `yaml:"scrape_interval" mapstructure:"scrape_interval"` // minutes
 }
 
+type WhaleConfig struct {
+	Enabled              bool     `yaml:"enabled" mapstructure:"enabled"`
+	EtherscanAPIKey      string   `yaml:"etherscan_api_key" mapstructure:"etherscan_api_key"`
+	BSCScanAPIKey        string   `yaml:"bscscan_api_key" mapstructure:"bscscan_api_key"`
+	MinTransactionUSD    float64  `yaml:"min_transaction_usd" mapstructure:"min_transaction_usd"`
+	Chains               []string `yaml:"chains" mapstructure:"chains"`
+	ScanInterval         int      `yaml:"scan_interval" mapstructure:"scan_interval"`          // minutes
+	LookbackBlocks       int      `yaml:"lookback_blocks" mapstructure:"lookback_blocks"`      // how many blocks to look back
+	NotificationCooldown int      `yaml:"notification_cooldown" mapstructure:"notification_cooldown"` // minutes
+}
+
 type AdminConfig struct {
 	Enabled        bool     `yaml:"enabled" mapstructure:"enabled"`
 	Host           string   `yaml:"host" mapstructure:"host"`
@@ -136,6 +148,10 @@ func LoadConfig(configPath string) (*Config, error) {
 	config.Payment.WebhookURL = getEnv("PAYMENT_WEBHOOK_URL", config.Payment.WebhookURL)
 	config.Payment.RedirectURL = getEnv("PAYMENT_REDIRECT_URL", config.Payment.RedirectURL)
 	config.Payment.WebhookPort = getEnv("PAYMENT_WEBHOOK_PORT", config.Payment.WebhookPort)
+
+	// Whale watching
+	config.Whale.EtherscanAPIKey = getEnv("ETHERSCAN_API_KEY", config.Whale.EtherscanAPIKey)
+	config.Whale.BSCScanAPIKey = getEnv("BSCSCAN_API_KEY", config.Whale.BSCScanAPIKey)
 
 	err := config.Validate()
 	if err != nil {
@@ -246,6 +262,14 @@ func (c *Config) SafeString() string {
 			Max IL Risk: %.2f%%
 			Min Volume: $%.0f
 			Scrape Interval: %d min
+
+		Whale Watching:
+			Enabled: %t
+			Chains: %v
+			Min Transaction: $%.0f
+			Scan Interval: %d min
+			Etherscan API: %s
+			BSCScan API: %s
 		`,
 		c.App.Environment,
 		c.App.Port,
@@ -282,6 +306,12 @@ func (c *Config) SafeString() string {
 		c.DeFi.MaxILRisk,
 		c.DeFi.MinVolume24h,
 		c.DeFi.ScrapeInterval,
+		c.Whale.Enabled,
+		c.Whale.Chains,
+		c.Whale.MinTransactionUSD,
+		c.Whale.ScanInterval,
+		maskSecret(c.Whale.EtherscanAPIKey),
+		maskSecret(c.Whale.BSCScanAPIKey),
 	)
 }
 

@@ -18,6 +18,8 @@ type User struct {
 	SubscriptionStripeID  string     `json:"subscription_stripe_id,omitempty"`
 	CapitalRange          string     `json:"capital_range,omitempty"`
 	RiskProfile           string     `json:"risk_profile,omitempty"`
+	ReferralCode          string     `gorm:"uniqueIndex" json:"referral_code,omitempty"` // User's personal referral code
+	ReferredByID          *uint      `gorm:"index" json:"referred_by_id,omitempty"`      // ID of user who referred this user
 	IsActive              bool       `gorm:"default:true" json:"is_active"`
 	IsBlocked             bool       `gorm:"default:false" json:"is_blocked"`
 	LastActiveAt          *time.Time `json:"last_active_at,omitempty"`

@@ -60,10 +60,16 @@ func AutoMigrate(db *gorm.DB) error {
 		&models.Payment{},
 		&models.ArbitrageOpportunity{},
 		&models.DeFiOpportunity{},
+		// Referral models
+		&models.Referral{},
+		&models.ReferralCode{},
+		&models.ReferralReward{},
 		// Premium Client models
 		&models.ClientSession{},
 		&models.ClientTrade{},
 		&models.ClientStatistics{},
+		// Whale watching
+		&models.WhaleTransaction{},
 	)
 }
 
