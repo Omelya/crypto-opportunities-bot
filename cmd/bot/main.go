@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto-opportunities-bot/internal/analytics"
 	"crypto-opportunities-bot/internal/arbitrage"
 	"crypto-opportunities-bot/internal/arbitrage/websocket"
 	"crypto-opportunities-bot/internal/bot"
@@ -60,6 +61,7 @@ func main() {
 	paymentRepo := repository.NewPaymentRepository(db)
 	arbRepo := repository.NewArbitrageRepository(db)
 	defiRepo := repository.NewDeFiRepository(db)
+	analyticsRepo := repository.NewAnalyticsRepository(db)
 
 	botAPI, err := tgbotapi.NewBotAPI(cfg.Telegram.BotToken)
 	if err != nil {
@@ -78,6 +80,10 @@ func main() {
 		defiRepo,
 	)
 	log.Printf("✅ Notification service initialized")
+
+	// Analytics service
+	analyticsService := analytics.NewService(analyticsRepo, actionRepo, userRepo, oppRepo)
+	log.Printf("✅ Analytics service initialized")
 
 	// Payment service (Monobank)
 	var paymentService *payment.Service
@@ -207,6 +213,19 @@ func main() {
 		cleanupScheduler.RunNow()
 	}
 
+	// Analytics Scheduler (daily at 3:00 AM)
+	analyticsScheduler := analytics.NewScheduler(analyticsService)
+	if err := analyticsScheduler.Start(); err != nil {
+		log.Fatalf("Failed to start analytics scheduler: %v", err)
+	}
+	defer analyticsScheduler.Stop()
+
+	// Run initial analytics calculation if in development mode
+	if cfg.App.Environment == "development" {
+		log.Println("Running initial analytics calculation...")
+		analyticsScheduler.RunNow()
+	}
+
 	// Arbitrage System (Premium feature)
 	var arbitrageDetector *arbitrage.Detector
 	var premiumWatcher *time.Ticker
@@ -228,7 +247,7 @@ func main() {
 		defer premiumWatcher.Stop()
 	}
 
-	telegramBot, err := bot.NewBot(cfg, userRepo, prefsRepo, oppRepo, actionRepo, subsRepo, arbRepo, defiRepo, paymentService)
+	telegramBot, err := bot.NewBot(cfg, userRepo, prefsRepo, oppRepo, actionRepo, subsRepo, arbRepo, defiRepo, paymentService, analyticsService)
 	if err != nil {
 		log.Fatalf("Failed to create bot: %v", err)
 	}

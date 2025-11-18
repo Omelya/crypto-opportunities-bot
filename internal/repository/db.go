@@ -64,6 +64,11 @@ func AutoMigrate(db *gorm.DB) error {
 		&models.ClientSession{},
 		&models.ClientTrade{},
 		&models.ClientStatistics{},
+		// Analytics models
+		&models.UserAnalytics{},
+		&models.DailyStats{},
+		&models.OpportunityStats{},
+		&models.UserEngagement{},
 	)
 }
 
