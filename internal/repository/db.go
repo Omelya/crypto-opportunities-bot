@@ -68,6 +68,8 @@ func AutoMigrate(db *gorm.DB) error {
 		&models.ClientSession{},
 		&models.ClientTrade{},
 		&models.ClientStatistics{},
+		// Whale watching
+		&models.WhaleTransaction{},
 	)
 }
 

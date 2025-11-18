@@ -286,6 +286,77 @@ func (f *Formatter) FormatDeFi(defi *models.DeFiOpportunity) string {
 	return builder.String()
 }
 
+// FormatWhale форматує whale transaction alert
+func (f *Formatter) FormatWhale(whale *models.WhaleTransaction) string {
+	var builder strings.Builder
+
+	// Emoji based on transaction size
+	emoji := "🐋"
+	if whale.IsMegaWhale() { // >$10M
+		emoji = "🐋🔥"
+	} else if whale.IsLargeWhale() { // $5M-$10M
+		emoji = "🐋⚡"
+	}
+
+	builder.WriteString(fmt.Sprintf("%s <b>WHALE ALERT!</b>\n\n", emoji))
+
+	// Transaction details
+	builder.WriteString(fmt.Sprintf("💰 Amount: <b>%.0f %s</b> (<b>$%.2fM</b>)\n",
+		whale.Amount, whale.Token, whale.AmountUSD/1_000_000))
+
+	builder.WriteString(fmt.Sprintf("⛓️ Chain: <b>%s</b>\n", f.titleCase(whale.Chain)))
+
+	// Direction indicator
+	builder.WriteString(fmt.Sprintf("%s Direction: <b>%s</b>\n",
+		whale.GetDirectionEmoji(), whale.GetSignalInterpretation()))
+
+	// From/To addresses with labels
+	if whale.FromLabel != "" {
+		builder.WriteString(fmt.Sprintf("📤 From: <b>%s</b>\n", whale.FromLabel))
+	} else {
+		builder.WriteString(fmt.Sprintf("📤 From: <code>%s...%s</code>\n",
+			whale.FromAddress[:6], whale.FromAddress[len(whale.FromAddress)-4:]))
+	}
+
+	if whale.ToLabel != "" {
+		builder.WriteString(fmt.Sprintf("📥 To: <b>%s</b>\n", whale.ToLabel))
+	} else {
+		builder.WriteString(fmt.Sprintf("📥 To: <code>%s...%s</code>\n",
+			whale.ToAddress[:6], whale.ToAddress[len(whale.ToAddress)-4:]))
+	}
+
+	builder.WriteString("\n")
+
+	// Market signal interpretation
+	builder.WriteString(fmt.Sprintf("📊 Signal: <b>%s</b>\n", whale.GetSignalInterpretation()))
+
+	// Historical outcome if available
+	if whale.HistoricalOutcome != "" {
+		builder.WriteString(fmt.Sprintf("📈 Historical: <b>%s</b>\n", whale.HistoricalOutcome))
+	}
+
+	if whale.PriceChange24h != 0 {
+		changeEmoji := "📈"
+		if whale.PriceChange24h < 0 {
+			changeEmoji = "📉"
+		}
+		builder.WriteString(fmt.Sprintf("%s Price 24h: <b>%+.2f%%</b>\n", changeEmoji, whale.PriceChange24h))
+	}
+
+	builder.WriteString("\n")
+
+	// Time and link
+	builder.WriteString(fmt.Sprintf("⏰ Time: <b>%s</b>\n", whale.GetTimeAgo()))
+
+	if whale.ExplorerURL != "" {
+		builder.WriteString(fmt.Sprintf("🔗 <a href=\"%s\">View on Explorer</a>\n", whale.ExplorerURL))
+	}
+
+	builder.WriteString("\n⚠️ <i>Whale movements don't guarantee price action. DYOR.</i>")
+
+	return builder.String()
+}
+
 // Helper методи
 
 func (f *Formatter) getOpportunityEmoji(oppType string) string {

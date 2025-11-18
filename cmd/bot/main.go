@@ -13,6 +13,7 @@ import (
 	"crypto-opportunities-bot/internal/referral"
 	"crypto-opportunities-bot/internal/repository"
 	"crypto-opportunities-bot/internal/scraper"
+	"crypto-opportunities-bot/internal/whale"
 	"log"
 	"os"
 	"os/signal"
@@ -62,6 +63,7 @@ func main() {
 	arbRepo := repository.NewArbitrageRepository(db)
 	defiRepo := repository.NewDeFiRepository(db)
 	referralRepo := repository.NewReferralRepository(db)
+	whaleRepo := repository.NewWhaleRepository(db)
 
 	botAPI, err := tgbotapi.NewBotAPI(cfg.Telegram.BotToken)
 	if err != nil {
@@ -78,6 +80,7 @@ func main() {
 		oppRepo,
 		arbRepo,
 		defiRepo,
+		whaleRepo,
 	)
 	log.Printf("✅ Notification service initialized")
 
@@ -180,6 +183,48 @@ func main() {
 		log.Printf("⚠️ DeFi monitoring disabled in config")
 	}
 
+	// Whale Watching System (Premium feature)
+	if cfg.Whale.Enabled {
+		// Create whale service with config
+		whaleServiceConfig := &whale.Config{
+			MinTransactionUSD: cfg.Whale.MinTransactionUSD,
+			EtherscanAPIKey:   cfg.Whale.EtherscanAPIKey,
+			BSCScanAPIKey:     cfg.Whale.BSCScanAPIKey,
+			Chains:            cfg.Whale.Chains,
+		}
+		whaleService := whale.NewService(whaleRepo, whaleServiceConfig)
+		log.Printf("✅ Whale watching service initialized")
+		log.Printf("   Chains: %v", cfg.Whale.Chains)
+		log.Printf("   Min Transaction: $%.0f", cfg.Whale.MinTransactionUSD)
+
+		// Wire whale callbacks to notification system
+		whaleService.OnWhaleDetected(func(whale *models.WhaleTransaction) {
+			log.Printf("🐋 Whale detected: %.0f %s ($%.2fM) - %s",
+				whale.Amount, whale.Token, whale.AmountUSD/1000000, whale.GetSignalInterpretation())
+
+			// Create notifications for premium users
+			if err := notificationService.CreateWhaleNotifications(whale); err != nil {
+				log.Printf("❌ Failed to create whale notifications: %v", err)
+			}
+		})
+
+		// Start whale monitoring scheduler
+		whaleTicker := startWhaleMonitoring(whaleService, cfg.Whale.ScanInterval)
+		defer whaleTicker.Stop()
+
+		// Initial scan if in development mode
+		if cfg.App.Environment == "development" {
+			log.Println("Running initial whale scan...")
+			go func() {
+				if _, err := whaleService.ScanAll(); err != nil {
+					log.Printf("⚠️ Initial whale scan failed: %v", err)
+				}
+			}()
+		}
+	} else {
+		log.Printf("⚠️ Whale watching disabled in config")
+	}
+
 	scraperScheduler := scraper.NewScheduler(scraperService)
 	if err := scraperScheduler.Start(); err != nil {
 		log.Fatalf("Failed to start scraper scheduler: %v", err)
@@ -238,7 +283,7 @@ func main() {
 		defer premiumWatcher.Stop()
 	}
 
-	telegramBot, err := bot.NewBot(cfg, userRepo, prefsRepo, oppRepo, actionRepo, subsRepo, arbRepo, defiRepo, paymentService, referralService)
+	telegramBot, err := bot.NewBot(cfg, userRepo, prefsRepo, oppRepo, actionRepo, subsRepo, arbRepo, defiRepo, whaleRepo, paymentService, referralService)
 	if err != nil {
 		log.Fatalf("Failed to create bot: %v", err)
 	}
@@ -468,5 +513,22 @@ func startDeFiMonitoring(defiScraper *scraper.DeFiScraper, intervalMinutes int) 
 	}()
 
 	log.Printf("✅ DeFi monitoring started (every %d min)", intervalMinutes)
+	return ticker
+}
+
+func startWhaleMonitoring(whaleService *whale.Service, intervalMinutes int) *time.Ticker {
+	interval := time.Duration(intervalMinutes) * time.Minute
+	ticker := time.NewTicker(interval)
+
+	go func() {
+		for range ticker.C {
+			log.Printf("🐋 Running whale scan (interval: %d min)...", intervalMinutes)
+			if _, err := whaleService.ScanAll(); err != nil {
+				log.Printf("❌ Whale scan error: %v", err)
+			}
+		}
+	}()
+
+	log.Printf("✅ Whale monitoring started (every %d min)", intervalMinutes)
 	return ticker
 }

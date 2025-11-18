@@ -21,6 +21,7 @@ type Bot struct {
 	subsRepo          repository.SubscriptionRepository
 	arbRepo           repository.ArbitrageRepository
 	defiRepo          repository.DeFiRepository
+	whaleRepo         repository.WhaleRepository
 	paymentService    *payment.Service
 	referralService   *referral.Service
 	config            *config.Config
@@ -37,6 +38,7 @@ func NewBot(
 	subsRepo repository.SubscriptionRepository,
 	arbRepo repository.ArbitrageRepository,
 	defiRepo repository.DeFiRepository,
+	whaleRepo repository.WhaleRepository,
 	paymentService *payment.Service,
 	referralService *referral.Service,
 ) (*Bot, error) {
@@ -58,6 +60,7 @@ func NewBot(
 		subsRepo:          subsRepo,
 		arbRepo:           arbRepo,
 		defiRepo:          defiRepo,
+		whaleRepo:         whaleRepo,
 		paymentService:    paymentService,
 		referralService:   referralService,
 		config:            cfg,
@@ -123,6 +126,8 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 		b.handleReferral(message)
 	case CommandInvite:
 		b.handleInvite(message)
+	case CommandWhales:
+		b.handleWhales(message)
 	case "client":
 		b.handleClient(message)
 	case "clientstats":
@@ -211,6 +216,13 @@ func (b *Bot) handleCallback(callback *tgbotapi.CallbackQuery) {
 	// Referral callbacks
 	if data == CallbackReferralStats || data == CallbackReferralInfo {
 		b.handleReferralCallback(callback, data)
+		return
+	}
+
+	// Whale callbacks
+	if strings.HasPrefix(data, "whale_") {
+		action := data
+		b.handleWhaleCallback(callback, action)
 		return
 	}
 

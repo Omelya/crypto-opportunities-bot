@@ -15,6 +15,7 @@ const (
 	CommandDeFi         = "defi"
 	CommandReferral     = "referral"
 	CommandInvite       = "invite"
+	CommandWhales       = "whales"
 )
 
 // Callback data для inline buttons

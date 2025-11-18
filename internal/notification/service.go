@@ -18,6 +18,7 @@ type Service struct {
 	oppRepo   repository.OpportunityRepository
 	arbRepo   repository.ArbitrageRepository
 	defiRepo  repository.DeFiRepository
+	whaleRepo repository.WhaleRepository
 	formatter *Formatter
 	filter    *Filter
 }
@@ -30,6 +31,7 @@ func NewService(
 	oppRepo repository.OpportunityRepository,
 	arbRepo repository.ArbitrageRepository,
 	defiRepo repository.DeFiRepository,
+	whaleRepo repository.WhaleRepository,
 ) *Service {
 	return &Service{
 		bot:       bot,
@@ -39,6 +41,7 @@ func NewService(
 		oppRepo:   oppRepo,
 		arbRepo:   arbRepo,
 		defiRepo:  defiRepo,
+		whaleRepo: whaleRepo,
 		formatter: NewFormatter(),
 		filter:    NewFilter(),
 	}
@@ -268,6 +271,81 @@ func (s *Service) CreateDeFiNotifications(defi *models.DeFiOpportunity) error {
 	}
 
 	log.Printf("✅ Created %d DeFi notifications for: %s", created, defi.PoolName)
+	return nil
+}
+
+// CreateWhaleNotifications створює notification для whale transaction (Premium only)
+func (s *Service) CreateWhaleNotifications(whale *models.WhaleTransaction) error {
+	log.Printf("🐋 Creating whale notifications for: %.0f %s ($%.2fM) - %s",
+		whale.Amount, whale.Token, whale.AmountUSD/1000000, whale.GetSignalInterpretation())
+
+	// Get all premium users
+	users, err := s.userRepo.List(0, 10000)
+	if err != nil {
+		return fmt.Errorf("failed to get users: %w", err)
+	}
+
+	created := 0
+
+	for _, user := range users {
+		// Only Premium users get whale notifications
+		if !user.IsPremium() {
+			continue
+		}
+
+		prefs, err := s.prefsRepo.GetByUserID(user.ID)
+		if err != nil {
+			log.Printf("Failed to get preferences for user %d: %v", user.ID, err)
+			continue
+		}
+
+		if prefs == nil {
+			log.Printf("No preferences for user %d, skipping", user.ID)
+			continue
+		}
+
+		// Format whale message
+		message := s.formatter.FormatWhale(whale)
+
+		// Determine priority based on transaction size
+		priority := models.NotificationPriorityNormal
+		if whale.IsMegaWhale() { // >$10M
+			priority = models.NotificationPriorityHigh
+		} else if whale.IsLargeWhale() { // $5M-$10M
+			priority = models.NotificationPriorityMedium
+		}
+
+		// Premium users get instant notifications (no delay)
+		notification := &models.Notification{
+			UserID:       user.ID,
+			Type:         "whale",
+			Priority:     priority,
+			Status:       models.NotificationStatusPending,
+			Message:      message,
+			ScheduledFor: nil, // Instant
+			MessageData: models.JSONMap{
+				"whale_id":    whale.ID,
+				"chain":       whale.Chain,
+				"token":       whale.Token,
+				"amount":      whale.Amount,
+				"amount_usd":  whale.AmountUSD,
+				"direction":   whale.Direction,
+				"from_label":  whale.FromLabel,
+				"to_label":    whale.ToLabel,
+				"tx_hash":     whale.TxHash,
+				"explorer_url": whale.ExplorerURL,
+			},
+		}
+
+		if err := s.notifRepo.Create(notification); err != nil {
+			log.Printf("Failed to create whale notification for user %d: %v", user.ID, err)
+			continue
+		}
+
+		created++
+	}
+
+	log.Printf("✅ Created %d whale notifications for %.0f %s", created, whale.Amount, whale.Token)
 	return nil
 }
 

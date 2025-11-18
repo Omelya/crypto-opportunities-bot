@@ -36,6 +36,18 @@ referral:
   friend_discount_percent: 20     # Discount for referred friend
   referral_expiry_days: 90        # Referral expires after 90 days if not activated
 
+whale:
+  enabled: true
+  etherscan_api_key: ""           # Get from https://etherscan.io/apis
+  bscscan_api_key: ""             # Get from https://bscscan.com/apis
+  min_transaction_usd: 1000000    # Minimum $1M USD to be considered whale transaction
+  chains:
+    - "ethereum"
+    - "bsc"
+  scan_interval: 5                # Scan every 5 minutes
+  lookback_blocks: 100            # How many blocks to look back per scan
+  notification_cooldown: 60       # Don't notify same whale twice within 60 minutes
+
 arbitrage:
   enabled: true
   pairs:
