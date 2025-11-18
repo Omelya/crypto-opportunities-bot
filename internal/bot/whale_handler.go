@@ -323,10 +323,10 @@ func (b *Bot) handleWhaleFilter(callback *tgbotapi.CallbackQuery, filter string)
 	}
 
 	filterName := map[string]string{
-		"ethereum":      "Ethereum",
-		"bsc":           "BSC",
-		"accumulation":  "Accumulation",
-		"distribution":  "Distribution",
+		"ethereum":     "Ethereum",
+		"bsc":          "BSC",
+		"accumulation": "Accumulation",
+		"distribution": "Distribution",
 	}[filter]
 
 	text := fmt.Sprintf(`🐋 *Whale Watching - %s*

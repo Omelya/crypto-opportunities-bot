@@ -5,6 +5,7 @@ const (
 	CommandStart        = "start"
 	CommandHelp         = "help"
 	CommandToday        = "today"
+	CommandAll          = "all"
 	CommandSettings     = "settings"
 	CommandStats        = "stats"
 	CommandPremium      = "premium"
@@ -46,11 +47,12 @@ const (
 	CallbackOppComplete   = "opp_complete"
 
 	// Menu callbacks
-	CallbackMenuToday    = "menu_today"
-	CallbackMenuAll      = "menu_all"
-	CallbackMenuSettings = "menu_settings"
-	CallbackMenuStats    = "menu_stats"
-	CallbackMenuPremium  = "menu_premium"
+	CallbackMenuToday            = "menu_today"
+	CallbackMenuAllOpportunities = "menu_all_opportunities"
+	CallbackMenuAll              = "menu_all"
+	CallbackMenuSettings         = "menu_settings"
+	CallbackMenuStats            = "menu_stats"
+	CallbackMenuPremium          = "menu_premium"
 
 	// Opportunities filter callbacks
 	CallbackFilterAll        = "filter_all"

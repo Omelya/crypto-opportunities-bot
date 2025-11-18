@@ -30,6 +30,30 @@ func (b *Bot) handleMenuCallback(callback *tgbotapi.CallbackQuery) {
 
 	switch callback.Data {
 	case CallbackMenuToday:
+		opportunities, err := b.getFilteredTodayOpportunities(user, prefs, 0)
+		if err != nil {
+			log.Printf("Error getting opportunities: %v", err)
+			b.sendError(chatID)
+			return
+		}
+
+		deleteMsg := tgbotapi.NewDeleteMessage(chatID, callback.Message.MessageID)
+		b.sendMessage(deleteMsg)
+
+		if len(opportunities) == 0 {
+			text := "🔍 На жаль, сьогодні немає нових можливостей, які відповідають твоїм критеріям.\n\n" +
+				"💡 Спробуй:\n" +
+				"• Подивитись /all - всі доступні можливості\n" +
+				"• Розширити фільтри у /settings"
+			msg := tgbotapi.NewMessage(chatID, text)
+			msg.ReplyMarkup = b.buildMainMenuKeyboard()
+			b.sendMessage(msg)
+			return
+		}
+
+		b.sendOpportunitiesList(chatID, user, opportunities, 0, "today")
+
+	case CallbackMenuAllOpportunities:
 		opportunities, err := b.getFilteredOpportunities(user, prefs, 0)
 		if err != nil {
 			log.Printf("Error getting opportunities: %v", err)
@@ -39,6 +63,15 @@ func (b *Bot) handleMenuCallback(callback *tgbotapi.CallbackQuery) {
 
 		deleteMsg := tgbotapi.NewDeleteMessage(chatID, callback.Message.MessageID)
 		b.sendMessage(deleteMsg)
+
+		if len(opportunities) == 0 {
+			text := "🔍 На жаль, зараз немає можливостей, які відповідають твоїм критеріям.\n\n" +
+				"💡 Спробуй розширити фільтри у /settings"
+			msg := tgbotapi.NewMessage(chatID, text)
+			msg.ReplyMarkup = b.buildMainMenuKeyboard()
+			b.sendMessage(msg)
+			return
+		}
 
 		b.sendOpportunitiesList(chatID, user, opportunities, 0, "all")
 

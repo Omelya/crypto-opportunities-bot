@@ -15,6 +15,7 @@ type OpportunityRepository interface {
 	Update(opp *models.Opportunity) error
 	Delete(id uint) error
 	ListActive(limit, offset int) ([]*models.Opportunity, error)
+	ListCreatedToday(limit, offset int) ([]*models.Opportunity, error)
 	ListByType(oppType string, limit, offset int) ([]*models.Opportunity, error)
 	ListByExchange(exchange string, limit, offset int) ([]*models.Opportunity, error)
 	ListByFilters(filters OpportunityFilters) ([]*models.Opportunity, error)
@@ -84,6 +85,23 @@ func (r *opportunityRepository) ListActive(limit, offset int) ([]*models.Opportu
 	var opps []*models.Opportunity
 	err := r.db.
 		Where("is_active = ?", true).
+		Order("created_at DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&opps).Error
+
+	return opps, err
+}
+
+func (r *opportunityRepository) ListCreatedToday(limit, offset int) ([]*models.Opportunity, error) {
+	var opps []*models.Opportunity
+
+	// Get start of today (00:00:00)
+	now := time.Now()
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+
+	err := r.db.
+		Where("is_active = ? AND created_at >= ?", true, startOfDay).
 		Order("created_at DESC").
 		Limit(limit).
 		Offset(offset).
